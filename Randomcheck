@@ -3,48 +3,49 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Automation Performance Report</title>
+    <title>Automation Report Generator - Sorted</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.3.2/papaparse.min.js"></script>
     <script src="https://cdn.tailwindcss.com"></script>
     <style>
         .report-table { border-collapse: collapse; width: 100%; font-family: sans-serif; }
-        .report-table th { background: #E2E2E2; border: 1px solid #999; padding: 4px 8px; font-size: 12px; }
-        .report-table td { border: 1px solid #999; padding: 4px 8px; font-size: 13px; }
-        .flow-cell { background: #FFFF00; font-weight: bold; text-align: center; vertical-align: middle; width: 150px; }
-        .week-cell { background: #fff; width: 100px; }
-        .header-total { background: #FFF2CC; text-align: center; font-weight: bold; }
+        .report-table th { background: #E2E2E2; border: 1px solid #999; padding: 4px 8px; font-size: 11px; text-transform: uppercase; }
+        .report-table td { border: 1px solid #999; padding: 6px 8px; font-size: 13px; }
+        .flow-cell { background: #FFFF00; font-weight: bold; text-align: center; vertical-align: middle; width: 160px; line-height: 1.2; }
+        .week-cell { background: #fff; width: 110px; font-weight: 500; }
+        .header-total { background: #FFF2CC; text-align: center; font-weight: bold; border-bottom: 2px solid #999; }
+        .spacer-row td { height: 12px; border: none !important; background: #f3f4f6; }
     </style>
 </head>
-<body class="bg-gray-100 p-6">
+<body class="bg-gray-100 p-4">
 
-    <div class="max-w-6xl mx-auto bg-white p-8 rounded-lg shadow-lg">
-        <h1 class="text-2xl font-bold mb-4">Automation Report Generator</h1>
+    <div class="max-w-6xl mx-auto bg-white p-6 rounded-xl shadow-lg">
+        <div class="flex items-center justify-between mb-6">
+            <h1 class="text-xl font-bold text-gray-800">Automation Report Generator <span class="text-blue-600 text-sm ml-2">(Sorted by Date)</span></h1>
+            <div class="flex gap-2">
+                <button onclick="downloadExcel()" class="bg-green-600 text-white px-4 py-2 rounded text-sm font-bold hover:bg-green-700">Download for Excel</button>
+            </div>
+        </div>
         
         <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
             <div class="p-4 border-2 border-dashed rounded bg-gray-50">
-                <label class="block font-bold mb-2">Upload CSV File</label>
-                <input type="file" id="csvFile" accept=".csv" class="text-sm">
+                <label class="block font-bold text-sm mb-2">1. Upload CSV</label>
+                <input type="file" id="csvFile" accept=".csv" class="text-xs">
             </div>
             <div>
-                <label class="block font-bold mb-2">Or Paste Data</label>
-                <textarea id="pasteArea" rows="3" class="w-full border p-2 text-xs font-mono" placeholder="Paste data here..."></textarea>
-                <button onclick="processData('paste')" class="mt-2 bg-blue-600 text-white px-4 py-2 rounded font-bold hover:bg-blue-700">Generate Report</button>
+                <label class="block font-bold text-sm mb-2">2. Or Paste from Excel</label>
+                <textarea id="pasteArea" rows="2" class="w-full border p-2 text-xs font-mono rounded" placeholder="Paste data here..."></textarea>
+                <button onclick="processInput()" class="mt-2 w-full bg-slate-800 text-white py-2 rounded text-sm font-bold hover:bg-black transition">Generate Sorted Report</button>
             </div>
         </div>
 
         <div id="reportContainer" class="hidden">
-            <div class="flex justify-between items-center mb-4">
-                <h2 class="text-xl font-bold">Generated Report</h2>
-                <button onclick="downloadExcel()" class="bg-green-600 text-white px-6 py-2 rounded font-bold hover:bg-green-700 shadow">Download for Excel (.csv)</button>
-            </div>
-            
-            <div class="overflow-x-auto border">
+            <div class="overflow-x-auto border rounded shadow-inner">
                 <table class="report-table" id="outputTable">
                     <thead>
                         <tr>
                             <th rowspan="2" style="background: white; border:none;"></th>
                             <th rowspan="2" style="background: white; border:none;"></th>
-                            <th colspan="7" class="header-total">Total</th>
+                            <th colspan="7" class="header-total text-sm">Total</th>
                         </tr>
                         <tr>
                             <th>Sent</th>
@@ -56,26 +57,24 @@
                             <th>AOV</th>
                         </tr>
                     </thead>
-                    <tbody id="reportTableBody">
-                        <!-- Data will be injected here -->
-                    </tbody>
+                    <tbody id="reportTableBody"></tbody>
                 </table>
             </div>
         </div>
     </div>
 
     <script>
-        let reportStructure = [];
+        let reportDataForCSV = [];
 
-        document.getElementById('csvFile').addEventListener('change', (e) => {
-            const file = e.target.files[0];
-            Papa.parse(file, { header: true, dynamicTyping: true, complete: (r) => buildReport(r.data) });
-        });
-
-        function processData() {
+        function processInput() {
             const text = document.getElementById('pasteArea').value.trim();
+            if(!text) return;
             Papa.parse(text, { header: true, dynamicTyping: true, complete: (r) => buildReport(r.data) });
         }
+
+        document.getElementById('csvFile').addEventListener('change', (e) => {
+            Papa.parse(e.target.files[0], { header: true, dynamicTyping: true, complete: (r) => buildReport(r.data) });
+        });
 
         function getWeekLabel(dateStr) {
             const date = new Date(dateStr);
@@ -94,8 +93,8 @@
 
             rawData.forEach(row => {
                 const fName = row[findKey(row, "Flow Name")];
-                const date = row[findKey(row, "Day")];
-                const week = getWeekLabel(date);
+                const dateVal = row[findKey(row, "Day")];
+                const week = getWeekLabel(dateVal);
                 if (!fName || !week) return;
 
                 if (!flows[fName]) flows[fName] = {};
@@ -104,12 +103,12 @@
                 }
 
                 const g = flows[fName][week];
-                // Sent/Delivered are often the same in many reports, adjust mapping if needed
-                g.sent += (parseFloat(row[findKey(row, "Total Reci")]) || 0);
-                g.delivered += (parseFloat(row[findKey(row, "Total Reci")]) || 0);
-                g.opens += (parseFloat(row[findKey(row, "Unique Op")]) || 0);
-                g.clicks += (parseFloat(row[findKey(row, "Unique Cli")]) || 0);
-                g.conv += (parseFloat(row[findKey(row, "Total Place")]) || 0);
+                // Smart mapping for different report headers
+                g.sent += (parseFloat(row[findKey(row, "Delivered")]) || parseFloat(row[findKey(row, "Total Reci")]) || 0);
+                g.delivered += (parseFloat(row[findKey(row, "Delivered")]) || parseFloat(row[findKey(row, "Total Reci")]) || 0);
+                g.opens += (parseFloat(row[findKey(row, "Unique Op")]) || parseFloat(row[findKey(row, "Read")]) || 0);
+                g.clicks += (parseFloat(row[findKey(row, "Unique Cli")]) || parseFloat(row[findKey(row, "Clicks")]) || 0);
+                g.conv += (parseFloat(row[findKey(row, "Total Place")]) || parseFloat(row[findKey(row, "Conversions")]) || 0);
                 g.rev += (parseFloat(row[findKey(row, "Revenue")]) || 0);
             });
 
@@ -119,44 +118,48 @@
         function renderTable(flows) {
             const body = document.getElementById('reportTableBody');
             body.innerHTML = '';
-            reportStructure = []; // Clear for download logic
+            reportDataForCSV = [];
 
             Object.keys(flows).forEach(flowName => {
                 const weeks = flows[flowName];
-                const weekKeys = Object.keys(weeks).sort();
+                
+                // --- SORTING LOGIC ---
+                // We extract the first number from labels like "Feb 8-14" to sort numerically
+                const weekKeys = Object.keys(weeks).sort((a, b) => {
+                    const numA = parseInt(a.match(/\d+/)[0]);
+                    const numB = parseInt(b.match(/\d+/)[0]);
+                    return numA - numB;
+                });
 
                 weekKeys.forEach((week, index) => {
                     const data = weeks[week];
                     const aov = data.conv > 0 ? (data.rev / data.conv).toFixed(0) : 0;
                     
                     const tr = document.createElement('tr');
-                    
-                    // Row Structure: Flow Name (merged-look) | Week | Data...
-                    let flowCell = '';
+                    let flowCellHtml = '';
                     if (index === 0) {
-                        flowCell = `<td rowspan="${weekKeys.length}" class="flow-cell">${flowName}</td>`;
+                        flowCellHtml = `<td rowspan="${weekKeys.length}" class="flow-cell">${flowName}</td>`;
                     }
 
                     tr.innerHTML = `
-                        ${flowCell}
+                        ${flowCellHtml}
                         <td class="week-cell">${week}</td>
-                        <td>${data.sent.toLocaleString()}</td>
-                        <td>${data.delivered.toLocaleString()}</td>
-                        <td>${data.opens.toLocaleString()}</td>
-                        <td>${data.clicks.toLocaleString()}</td>
-                        <td>${data.conv.toLocaleString()}</td>
+                        <td>${Math.round(data.sent).toLocaleString()}</td>
+                        <td>${Math.round(data.delivered).toLocaleString()}</td>
+                        <td>${Math.round(data.opens).toLocaleString()}</td>
+                        <td>${Math.round(data.clicks).toLocaleString()}</td>
+                        <td>${Math.round(data.conv).toLocaleString()}</td>
                         <td>$${data.rev.toLocaleString(undefined, {minimumFractionDigits:2})}</td>
                         <td>${aov}</td>
                     `;
                     body.appendChild(tr);
 
-                    // Save for CSV download
-                    reportStructure.push({
+                    reportDataForCSV.push({
                         "Flow": index === 0 ? flowName : "",
                         "Week": week,
                         "Sent": data.sent,
                         "Delivered": data.delivered,
-                        "Opens": data.opens,
+                        "Read/Opens": data.opens,
                         "Clicks": data.clicks,
                         "Conversions": data.conv,
                         "Revenue": data.rev.toFixed(2),
@@ -164,9 +167,10 @@
                     });
                 });
                 
-                // Add a blank separator row
+                // Empty separator between different flows
                 const spacer = document.createElement('tr');
-                spacer.innerHTML = `<td colspan="9" style="height:15px; border:none; background:#f3f4f6;"></td>`;
+                spacer.className = 'spacer-row';
+                spacer.innerHTML = `<td colspan="9"></td>`;
                 body.appendChild(spacer);
             });
 
@@ -174,12 +178,12 @@
         }
 
         function downloadExcel() {
-            const csv = Papa.unparse(reportStructure);
+            const csv = Papa.unparse(reportDataForCSV);
             const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
             const url = URL.createObjectURL(blob);
             const link = document.createElement("a");
             link.href = url;
-            link.download = "Formatted_Flow_Report.csv";
+            link.download = "Automation_Report_Sorted.csv";
             link.click();
         }
     </script>
