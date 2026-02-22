@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Automation Report Generator - Sorted</title>
+    <title>Automation Report Generator - Fixed Conversions</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.3.2/papaparse.min.js"></script>
     <script src="https://cdn.tailwindcss.com"></script>
     <style>
@@ -20,7 +20,7 @@
 
     <div class="max-w-6xl mx-auto bg-white p-6 rounded-xl shadow-lg">
         <div class="flex items-center justify-between mb-6">
-            <h1 class="text-xl font-bold text-gray-800">Automation Report Generator <span class="text-blue-600 text-sm ml-2">(Sorted by Date)</span></h1>
+            <h1 class="text-xl font-bold text-gray-800">Automation Report Generator <span class="text-green-600 text-sm ml-2">(Conversions Fixed)</span></h1>
             <div class="flex gap-2">
                 <button onclick="downloadExcel()" class="bg-green-600 text-white px-4 py-2 rounded text-sm font-bold hover:bg-green-700">Download for Excel</button>
             </div>
@@ -34,7 +34,7 @@
             <div>
                 <label class="block font-bold text-sm mb-2">2. Or Paste from Excel</label>
                 <textarea id="pasteArea" rows="2" class="w-full border p-2 text-xs font-mono rounded" placeholder="Paste data here..."></textarea>
-                <button onclick="processInput()" class="mt-2 w-full bg-slate-800 text-white py-2 rounded text-sm font-bold hover:bg-black transition">Generate Sorted Report</button>
+                <button onclick="processInput()" class="mt-2 w-full bg-slate-800 text-white py-2 rounded text-sm font-bold hover:bg-black transition">Generate Report</button>
             </div>
         </div>
 
@@ -103,12 +103,21 @@
                 }
 
                 const g = flows[fName][week];
-                // Smart mapping for different report headers
+                
+                // MAPPING LOGIC
                 g.sent += (parseFloat(row[findKey(row, "Delivered")]) || parseFloat(row[findKey(row, "Total Reci")]) || 0);
                 g.delivered += (parseFloat(row[findKey(row, "Delivered")]) || parseFloat(row[findKey(row, "Total Reci")]) || 0);
                 g.opens += (parseFloat(row[findKey(row, "Unique Op")]) || parseFloat(row[findKey(row, "Read")]) || 0);
                 g.clicks += (parseFloat(row[findKey(row, "Unique Cli")]) || parseFloat(row[findKey(row, "Clicks")]) || 0);
-                g.conv += (parseFloat(row[findKey(row, "Total Place")]) || parseFloat(row[findKey(row, "Conversions")]) || 0);
+                
+                // --- FIX FOR CONVERSIONS ---
+                // It now searches for "Placed Order", "Total Place", "Placed", or "Conversions"
+                const convVal = parseFloat(row[findKey(row, "Placed Order")]) || 
+                                parseFloat(row[findKey(row, "Total Place")]) || 
+                                parseFloat(row[findKey(row, "Placed")]) || 
+                                parseFloat(row[findKey(row, "Conversions")]) || 0;
+                g.conv += convVal;
+                
                 g.rev += (parseFloat(row[findKey(row, "Revenue")]) || 0);
             });
 
@@ -123,8 +132,7 @@
             Object.keys(flows).forEach(flowName => {
                 const weeks = flows[flowName];
                 
-                // --- SORTING LOGIC ---
-                // We extract the first number from labels like "Feb 8-14" to sort numerically
+                // Chrono-sort weeks
                 const weekKeys = Object.keys(weeks).sort((a, b) => {
                     const numA = parseInt(a.match(/\d+/)[0]);
                     const numB = parseInt(b.match(/\d+/)[0]);
@@ -154,20 +162,20 @@
                     `;
                     body.appendChild(tr);
 
+                    // Add explicitly to the CSV data object
                     reportDataForCSV.push({
                         "Flow": index === 0 ? flowName : "",
                         "Week": week,
-                        "Sent": data.sent,
-                        "Delivered": data.delivered,
-                        "Read/Opens": data.opens,
-                        "Clicks": data.clicks,
-                        "Conversions": data.conv,
+                        "Sent": Math.round(data.sent),
+                        "Delivered": Math.round(data.delivered),
+                        "Read/Opens": Math.round(data.opens),
+                        "Clicks": Math.round(data.clicks),
+                        "Conversions": Math.round(data.conv), // This will now show up in Excel
                         "Revenue": data.rev.toFixed(2),
                         "AOV": aov
                     });
                 });
                 
-                // Empty separator between different flows
                 const spacer = document.createElement('tr');
                 spacer.className = 'spacer-row';
                 spacer.innerHTML = `<td colspan="9"></td>`;
@@ -178,12 +186,13 @@
         }
 
         function downloadExcel() {
+            if(reportDataForCSV.length === 0) return alert("Generate the report first!");
             const csv = Papa.unparse(reportDataForCSV);
             const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
             const url = URL.createObjectURL(blob);
             const link = document.createElement("a");
             link.href = url;
-            link.download = "Automation_Report_Sorted.csv";
+            link.download = `Automation_Summary_Report_${new Date().toISOString().slice(0,10)}.csv`;
             link.click();
         }
     </script>
