@@ -1,1 +1,167 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Flow Data Analyzer</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.3.2/papaparse.min.js"></script>
+    <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-gray-50 min-h-screen p-8">
 
+    <div class="max-w-6xl mx-auto bg-white p-8 rounded-xl shadow-md">
+        <h1 class="text-2xl font-bold mb-2 text-gray-800">Flow Data Aggregator</h1>
+        <p class="text-gray-600 mb-6">Upload your CSV to get total sums grouped by <strong>Flow Name</strong>.</p>
+
+        <!-- Upload Section -->
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
+            <div class="border-2 border-dashed border-blue-200 p-6 rounded-lg text-center">
+                <label class="block mb-2 font-semibold">Upload CSV File</label>
+                <input type="file" id="csvFile" accept=".csv" class="block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100">
+            </div>
+            <div class="flex flex-col">
+                <label class="block mb-2 font-semibold">Or Paste Data Here</label>
+                <textarea id="pasteArea" placeholder="Paste CSV rows here..." class="flex-1 p-2 border rounded-md h-24 text-sm font-mono"></textarea>
+                <button onclick="processPaste()" class="mt-2 bg-blue-600 text-white py-2 rounded hover:bg-blue-700 transition">Analyze Pasted Data</button>
+            </div>
+        </div>
+
+        <!-- Controls -->
+        <div id="controls" class="hidden mb-4 flex justify-between items-center">
+            <h2 class="text-xl font-bold">Analysis Results</h2>
+            <div class="space-x-2">
+                <button onclick="copyToClipboard()" class="bg-gray-200 px-4 py-2 rounded hover:bg-gray-300">Copy to Clipboard</button>
+                <button onclick="downloadCSV()" class="bg-green-600 text-white px-4 py-2 rounded hover:bg-green-700">Download CSV</button>
+            </div>
+        </div>
+
+        <!-- Table Container -->
+        <div class="overflow-x-auto border rounded-lg">
+            <table id="resultTable" class="min-w-full divide-y divide-gray-200 hidden">
+                <thead class="bg-gray-50" id="tableHead"></thead>
+                <tbody class="bg-white divide-y divide-gray-200" id="tableBody"></tbody>
+            </table>
+        </div>
+    </div>
+
+    <script>
+        let processedData = [];
+
+        // Handle File Upload
+        document.getElementById('csvFile').addEventListener('change', function(e) {
+            const file = e.target.files[0];
+            Papa.parse(file, {
+                header: true,
+                dynamicTyping: true,
+                complete: function(results) {
+                    analyzeData(results.data);
+                }
+            });
+        });
+
+        // Handle Paste
+        function processPaste() {
+            const text = document.getElementById('pasteArea').value;
+            Papa.parse(text, {
+                header: true,
+                dynamicTyping: true,
+                complete: function(results) {
+                    analyzeData(results.data);
+                }
+            });
+        }
+
+        function analyzeData(rawData) {
+            if (!rawData || rawData.length === 0) return;
+
+            // Grouping Logic
+            const groupingKey = "Flow Name";
+            const totals = {};
+
+            // Identify columns to sum (all numeric ones except ID related stuff)
+            const keys = Object.keys(rawData[0]);
+            const numericKeys = keys.filter(key => 
+                typeof rawData[0][key] === 'number' && 
+                !key.toLowerCase().includes('id') && 
+                key !== groupingKey
+            );
+
+            rawData.forEach(row => {
+                const name = row[groupingKey];
+                if (!name) return;
+
+                if (!totals[name]) {
+                    totals[name] = { [groupingKey]: name };
+                    numericKeys.forEach(k => totals[name][k] = 0);
+                }
+
+                numericKeys.forEach(k => {
+                    totals[name][k] += (row[k] || 0);
+                });
+            });
+
+            // Convert back to array
+            processedData = Object.values(totals);
+            displayData(processedData, [groupingKey, ...numericKeys]);
+        }
+
+        function displayData(data, headers) {
+            const head = document.getElementById('tableHead');
+            const body = document.getElementById('tableBody');
+            const table = document.getElementById('resultTable');
+            const controls = document.getElementById('controls');
+
+            // Clear previous
+            head.innerHTML = '';
+            body.innerHTML = '';
+
+            // Header row
+            const trHead = document.createElement('tr');
+            headers.forEach(h => {
+                const th = document.createElement('th');
+                th.className = "px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider";
+                th.innerText = h;
+                trHead.appendChild(th);
+            });
+            head.appendChild(trHead);
+
+            // Body rows
+            data.forEach(row => {
+                const tr = document.createElement('tr');
+                headers.forEach(h => {
+                    const td = document.createElement('td');
+                    td.className = "px-4 py-2 whitespace-nowrap text-sm text-gray-700";
+                    // Format numbers to 2 decimal places if needed
+                    const val = row[h];
+                    td.innerText = typeof val === 'number' ? val.toLocaleString(undefined, {maximumFractionDigits: 2}) : val;
+                    tr.appendChild(td);
+                });
+                body.appendChild(tr);
+            });
+
+            table.classList.remove('hidden');
+            controls.classList.remove('hidden');
+        }
+
+        function downloadCSV() {
+            const csv = Papa.unparse(processedData);
+            const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+            const link = document.createElement("a");
+            const url = URL.createObjectURL(blob);
+            link.setAttribute("href", url);
+            link.setAttribute("download", "flow_analysis.csv");
+            link.style.visibility = 'hidden';
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+        }
+
+        function copyToClipboard() {
+            const csv = Papa.unparse(processedData);
+            navigator.clipboard.writeText(csv).then(() => {
+                alert("Data copied to clipboard in CSV format!");
+            });
+        }
+    </script>
+</body>
+</html>
