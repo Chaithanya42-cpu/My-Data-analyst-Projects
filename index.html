@@ -3,198 +3,210 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Automation Report Generator - Fixed Conversions</title>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.3.2/papaparse.min.js"></script>
-    <script src="https://cdn.tailwindcss.com"></script>
+    <title>BAU Data Analysis Tool</title>
     <style>
-        .report-table { border-collapse: collapse; width: 100%; font-family: sans-serif; }
-        .report-table th { background: #E2E2E2; border: 1px solid #999; padding: 4px 8px; font-size: 11px; text-transform: uppercase; }
-        .report-table td { border: 1px solid #999; padding: 6px 8px; font-size: 13px; }
-        .flow-cell { background: #FFFF00; font-weight: bold; text-align: center; vertical-align: middle; width: 160px; line-height: 1.2; }
-        .week-cell { background: #fff; width: 110px; font-weight: 500; }
-        .header-total { background: #FFF2CC; text-align: center; font-weight: bold; border-bottom: 2px solid #999; }
-        .spacer-row td { height: 12px; border: none !important; background: #f3f4f6; }
+        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; margin: 20px; background-color: #f0f2f5; color: #333; }
+        .container { max-width: 1200px; margin: auto; background: white; padding: 30px; border-radius: 12px; box-shadow: 0 4px 20px rgba(0,0,0,0.08); }
+        h1 { text-align: center; color: #1a73e8; margin-top: 0; }
+        .description { text-align: center; margin-bottom: 20px; color: #666; }
+        
+        textarea { width: 100%; height: 180px; margin-bottom: 15px; border: 2px solid #ddd; padding: 12px; border-radius: 8px; font-family: 'Courier New', monospace; font-size: 14px; transition: border-color 0.3s; box-sizing: border-box; }
+        textarea:focus { border-color: #1a73e8; outline: none; }
+        
+        .controls { text-align: center; margin-bottom: 40px; }
+        button { padding: 12px 30px; font-size: 15px; font-weight: bold; cursor: pointer; border: none; border-radius: 6px; margin: 5px; transition: 0.2s; }
+        .btn-process { background-color: #1a73e8; color: white; }
+        .btn-process:hover { background-color: #1557b0; }
+        .btn-csv { background-color: #34a853; color: white; }
+        .btn-csv:hover { background-color: #2d8e47; }
+
+        .analysis-container { overflow-x: auto; }
+        .main-title-header { background-color: #d1d9e6; text-align: center; padding: 12px; font-weight: bold; font-size: 20px; border: 1px solid #a3b1c6; margin-bottom: 0; }
+        
+        table { width: 100%; border-collapse: collapse; margin-bottom: 35px; background: white; border: 1px solid #999; }
+        th, td { border: 1px solid #bbb; padding: 8px 12px; text-align: center; }
+        th { background-color: #e2e6ea; color: #444; text-transform: capitalize; }
+        
+        .flow-label { background-color: #fff2cc; font-weight: bold; text-align: left; vertical-align: middle; font-size: 15px; width: 220px; }
+        .period-col { text-align: left; width: 110px; font-weight: bold; }
+        .total-row { background-color: #f1f3f4; font-weight: bold; }
+        
+        .empty-state { text-align: center; padding: 50px; color: #888; border: 2px dashed #ccc; border-radius: 8px; }
     </style>
 </head>
-<body class="bg-gray-100 p-4">
+<body>
 
-    <div class="max-w-6xl mx-auto bg-white p-6 rounded-xl shadow-lg">
-        <div class="flex items-center justify-between mb-6">
-            <h1 class="text-xl font-bold text-gray-800">Automation Report Generator <span class="text-green-600 text-sm ml-2">(Conversions Fixed)</span></h1>
-            <div class="flex gap-2">
-                <button onclick="downloadExcel()" class="bg-green-600 text-white px-4 py-2 rounded text-sm font-bold hover:bg-green-700">Download for Excel</button>
-            </div>
-        </div>
-        
-        <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
-            <div class="p-4 border-2 border-dashed rounded bg-gray-50">
-                <label class="block font-bold text-sm mb-2">1. Upload CSV</label>
-                <input type="file" id="csvFile" accept=".csv" class="text-xs">
-            </div>
-            <div>
-                <label class="block font-bold text-sm mb-2">2. Or Paste from Excel</label>
-                <textarea id="pasteArea" rows="2" class="w-full border p-2 text-xs font-mono rounded" placeholder="Paste data here..."></textarea>
-                <button onclick="processInput()" class="mt-2 w-full bg-slate-800 text-white py-2 rounded text-sm font-bold hover:bg-black transition">Generate Report</button>
-            </div>
-        </div>
-
-        <div id="reportContainer" class="hidden">
-            <div class="overflow-x-auto border rounded shadow-inner">
-                <table class="report-table" id="outputTable">
-                    <thead>
-                        <tr>
-                            <th rowspan="2" style="background: white; border:none;"></th>
-                            <th rowspan="2" style="background: white; border:none;"></th>
-                            <th colspan="7" class="header-total text-sm">Total</th>
-                        </tr>
-                        <tr>
-                            <th>Sent</th>
-                            <th>Delivered</th>
-                            <th>Read/Opens</th>
-                            <th>Clicks</th>
-                            <th>Conversions</th>
-                            <th>Revenue</th>
-                            <th>AOV</th>
-                        </tr>
-                    </thead>
-                    <tbody id="reportTableBody"></tbody>
-                </table>
-            </div>
-        </div>
+<div class="container">
+    <h1>BAU Automation Data Analysis</h1>
+    <p class="description">Copy all cells (including headers) from your raw data Excel sheet and paste them below.</p>
+    
+    <textarea id="dataInput" placeholder="Paste data here... (Tip: Click row 1, hold Shift, click last row in Excel, Ctrl+C, Ctrl+V here)"></textarea>
+    
+    <div class="controls">
+        <button class="btn-process" onclick="processData()">Analyze Data</button>
+        <button class="btn-csv" onclick="downloadCSV()">Download as Excel/CSV</button>
     </div>
 
-    <script>
-        let reportDataForCSV = [];
+    <div id="output">
+        <div class="empty-state">Data analysis results will appear here...</div>
+    </div>
+</div>
 
-        function processInput() {
-            const text = document.getElementById('pasteArea').value.trim();
-            if(!text) return;
-            Papa.parse(text, { header: true, dynamicTyping: true, complete: (r) => buildReport(r.data) });
+<script>
+    const weeks = ["Week1", "Week2", "Week3", "Week4"];
+    const weekLabels = {
+        "Week1": "Feb 1-7",
+        "Week2": "Feb 8-14",
+        "Week3": "Feb 15-21",
+        "Week4": "Feb 22-28"
+    };
+
+    function processData() {
+        const input = document.getElementById('dataInput').value;
+        if (!input.trim()) { alert("Please paste your data into the box first."); return; }
+
+        const rows = input.split('\n');
+        const rawHeaders = rows[0].split('\t').map(h => h.trim().toLowerCase());
+        
+        // Find indices dynamically based on the headers in Image 2
+        // Handling the leading unnamed week column manually
+        const weekIdx = 0; 
+        const titleIdx = findIdx(rawHeaders, 'title');
+        const recipientsIdx = findIdx(rawHeaders, 'unique users');
+        const readIdx = findIdx(rawHeaders, 'read');
+        const clicksIdx = findIdx(rawHeaders, 'ctr'); // CTR contains click counts in provided data
+        const convRateIdx = findIdx(rawHeaders, 'conversion rate');
+        const revIdx = findIdx(rawHeaders, 'revenue');
+        const deliveredIdx = findIdx(rawHeaders, 'delivered');
+
+        let dataMap = {}; // Structured as dataMap[Title][Week]
+
+        for (let i = 1; i < rows.length; i++) {
+            const cols = rows[i].split('\t');
+            if (cols.length < 5) continue;
+
+            const rawTitle = (cols[titleIdx] || "").trim();
+            const weekKey = (cols[weekIdx] || "").trim();
+            
+            if (!rawTitle || !weeks.includes(weekKey)) continue;
+
+            if (!dataMap[rawTitle]) {
+                dataMap[rawTitle] = {};
+                weeks.forEach(w => dataMap[rawTitle][w] = { r: 0, o: 0, cl: 0, cv: 0, rev: 0 });
+            }
+
+            // Clean numbers (remove currency symbols and commas)
+            const delivered = parseFloat((cols[deliveredIdx] || "0").replace(/[₹,]/g, '')) || 0;
+            const convRate = parseFloat((cols[convRateIdx] || "0").replace('%', '')) || 0;
+            const rev = parseFloat((cols[revIdx] || "0").replace(/[₹,]/g, '')) || 0;
+
+            const obj = dataMap[rawTitle][weekKey];
+            obj.r += parseFloat((cols[recipientsIdx] || "0").replace(/,/g, '')) || 0;
+            obj.o += parseFloat((cols[readIdx] || "0").replace(/,/g, '')) || 0;
+            obj.cl += parseFloat((cols[clicksIdx] || "0").replace(/,/g, '')) || 0;
+            obj.cv += Math.round((delivered * convRate) / 100); // Conversions calculation
+            obj.rev += rev;
         }
 
-        document.getElementById('csvFile').addEventListener('change', (e) => {
-            Papa.parse(e.target.files[0], { header: true, dynamicTyping: true, complete: (r) => buildReport(r.data) });
+        render(dataMap);
+    }
+
+    function findIdx(arr, keyword) {
+        return arr.findIndex(item => item.includes(keyword));
+    }
+
+    function render(dataMap) {
+        let output = '<div class="analysis-container"><div class="main-title-header">BAU Automations Analysis</div>';
+        
+        const sortedTitles = Object.keys(dataMap).sort();
+
+        if (sortedTitles.length === 0) {
+            document.getElementById('output').innerHTML = '<div class="empty-state" style="color:red">Error: No valid data found. Ensure headers like "Title" and "Revenue" were pasted.</div>';
+            return;
+        }
+
+        sortedTitles.forEach(title => {
+            output += `<table>
+                <thead>
+                    <tr>
+                        <th class="flow-label" rowspan="6">${title}</th>
+                        <th class="period-col">Period</th>
+                        <th>Unique Recipients</th>
+                        <th>Read/Opens</th>
+                        <th>Clicks</th>
+                        <th>Conversions</th>
+                        <th>Revenue</th>
+                        <th>AOV</th>
+                    </tr>
+                </thead>
+                <tbody>`;
+
+            let t = { r: 0, o: 0, cl: 0, cv: 0, rev: 0 };
+
+            weeks.forEach(wk => {
+                const d = dataMap[title][wk];
+                const aov = d.cv > 0 ? Math.round(d.rev / d.cv) : 0;
+                
+                output += `<tr>
+                    <td class="period-col">${weekLabels[wk]}</td>
+                    <td>${d.r.toLocaleString()}</td>
+                    <td>${d.o.toLocaleString()}</td>
+                    <td>${d.cl.toLocaleString()}</td>
+                    <td>${d.cv.toLocaleString()}</td>
+                    <td>${formatCurr(d.rev)}</td>
+                    <td>${aov.toLocaleString()}</td>
+                </tr>`;
+
+                t.r += d.r; t.o += d.o; t.cl += d.cl; t.cv += d.cv; t.rev += d.rev;
+            });
+
+            const totalAov = t.cv > 0 ? Math.round(t.rev / t.cv) : 0;
+            output += `<tr class="total-row">
+                <td class="period-col">Total</td>
+                <td>${t.r.toLocaleString()}</td>
+                <td>${t.o.toLocaleString()}</td>
+                <td>${t.cl.toLocaleString()}</td>
+                <td>${t.cv.toLocaleString()}</td>
+                <td>${formatCurr(t.rev)}</td>
+                <td>${totalAov.toLocaleString()}</td>
+            </tr></tbody></table>`;
         });
 
-        function getWeekLabel(dateStr) {
-            const date = new Date(dateStr);
-            if (isNaN(date)) return null;
-            const day = date.getDate();
-            const month = date.toLocaleString('default', { month: 'short' });
-            if (day <= 7) return `${month} 1-7`;
-            if (day <= 14) return `${month} 8-14`;
-            if (day <= 21) return `${month} 15-21`;
-            return `${month} 22+`;
-        }
+        output += '</div>';
+        document.getElementById('output').innerHTML = output;
+    }
 
-        function buildReport(rawData) {
-            const flows = {};
-            const findKey = (row, partial) => Object.keys(row).find(k => k.toLowerCase().includes(partial.toLowerCase()));
+    function formatCurr(num) {
+        return "$" + num.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    }
 
-            rawData.forEach(row => {
-                const fName = row[findKey(row, "Flow Name")];
-                const dateVal = row[findKey(row, "Day")];
-                const week = getWeekLabel(dateVal);
-                if (!fName || !week) return;
+    function downloadCSV() {
+        const rows = document.querySelectorAll('table tbody tr');
+        if (rows.length === 0) return;
 
-                if (!flows[fName]) flows[fName] = {};
-                if (!flows[fName][week]) {
-                    flows[fName][week] = { sent: 0, delivered: 0, opens: 0, clicks: 0, conv: 0, rev: 0 };
-                }
-
-                const g = flows[fName][week];
-                
-                // MAPPING LOGIC
-                g.sent += (parseFloat(row[findKey(row, "Delivered")]) || parseFloat(row[findKey(row, "Total Reci")]) || 0);
-                g.delivered += (parseFloat(row[findKey(row, "Delivered")]) || parseFloat(row[findKey(row, "Total Reci")]) || 0);
-                g.opens += (parseFloat(row[findKey(row, "Unique Op")]) || parseFloat(row[findKey(row, "Read")]) || 0);
-                g.clicks += (parseFloat(row[findKey(row, "Unique Cli")]) || parseFloat(row[findKey(row, "Clicks")]) || 0);
-                
-                // --- FIX FOR CONVERSIONS ---
-                // It now searches for "Placed Order", "Total Place", "Placed", or "Conversions"
-                const convVal = parseFloat(row[findKey(row, "Placed Order")]) || 
-                                parseFloat(row[findKey(row, "Total Place")]) || 
-                                parseFloat(row[findKey(row, "Placed")]) || 
-                                parseFloat(row[findKey(row, "Conversions")]) || 0;
-                g.conv += convVal;
-                
-                g.rev += (parseFloat(row[findKey(row, "Revenue")]) || 0);
+        let csv = "Journey/Title,Period,Unique Recipients,Read/Opens,Clicks,Conversions,Revenue,AOV\n";
+        
+        const tables = document.querySelectorAll('table');
+        tables.forEach(table => {
+            const flowName = table.querySelector('.flow-label').innerText;
+            const dataRows = table.querySelectorAll('tbody tr');
+            dataRows.forEach(row => {
+                const cols = row.querySelectorAll('td');
+                const rowData = [flowName];
+                cols.forEach(c => rowData.push(c.innerText.replace(/[$|,]/g, '')));
+                csv += rowData.join(",") + "\n";
             });
+        });
 
-            renderTable(flows);
-        }
+        const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+        const link = document.createElement("a");
+        link.href = URL.createObjectURL(blob);
+        link.setAttribute("download", "Automations_Analysis.csv");
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+    }
+</script>
 
-        function renderTable(flows) {
-            const body = document.getElementById('reportTableBody');
-            body.innerHTML = '';
-            reportDataForCSV = [];
-
-            Object.keys(flows).forEach(flowName => {
-                const weeks = flows[flowName];
-                
-                // Chrono-sort weeks
-                const weekKeys = Object.keys(weeks).sort((a, b) => {
-                    const numA = parseInt(a.match(/\d+/)[0]);
-                    const numB = parseInt(b.match(/\d+/)[0]);
-                    return numA - numB;
-                });
-
-                weekKeys.forEach((week, index) => {
-                    const data = weeks[week];
-                    const aov = data.conv > 0 ? (data.rev / data.conv).toFixed(0) : 0;
-                    
-                    const tr = document.createElement('tr');
-                    let flowCellHtml = '';
-                    if (index === 0) {
-                        flowCellHtml = `<td rowspan="${weekKeys.length}" class="flow-cell">${flowName}</td>`;
-                    }
-
-                    tr.innerHTML = `
-                        ${flowCellHtml}
-                        <td class="week-cell">${week}</td>
-                        <td>${Math.round(data.sent).toLocaleString()}</td>
-                        <td>${Math.round(data.delivered).toLocaleString()}</td>
-                        <td>${Math.round(data.opens).toLocaleString()}</td>
-                        <td>${Math.round(data.clicks).toLocaleString()}</td>
-                        <td>${Math.round(data.conv).toLocaleString()}</td>
-                        <td>$${data.rev.toLocaleString(undefined, {minimumFractionDigits:2})}</td>
-                        <td>${aov}</td>
-                    `;
-                    body.appendChild(tr);
-
-                    // Add explicitly to the CSV data object
-                    reportDataForCSV.push({
-                        "Flow": index === 0 ? flowName : "",
-                        "Week": week,
-                        "Sent": Math.round(data.sent),
-                        "Delivered": Math.round(data.delivered),
-                        "Read/Opens": Math.round(data.opens),
-                        "Clicks": Math.round(data.clicks),
-                        "Conversions": Math.round(data.conv), // This will now show up in Excel
-                        "Revenue": data.rev.toFixed(2),
-                        "AOV": aov
-                    });
-                });
-                
-                const spacer = document.createElement('tr');
-                spacer.className = 'spacer-row';
-                spacer.innerHTML = `<td colspan="9"></td>`;
-                body.appendChild(spacer);
-            });
-
-            document.getElementById('reportContainer').classList.remove('hidden');
-        }
-
-        function downloadExcel() {
-            if(reportDataForCSV.length === 0) return alert("Generate the report first!");
-            const csv = Papa.unparse(reportDataForCSV);
-            const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
-            const url = URL.createObjectURL(blob);
-            const link = document.createElement("a");
-            link.href = url;
-            link.download = `Automation_Summary_Report_${new Date().toISOString().slice(0,10)}.csv`;
-            link.click();
-        }
-    </script>
 </body>
 </html>
