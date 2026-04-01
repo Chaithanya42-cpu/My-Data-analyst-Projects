@@ -1,0 +1,195 @@
+--- START OF FILE ai_studio_code (8).html ---
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Daily to Weekly Flow Analysis</title>
+    <style>
+        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; margin: 20px; background-color: #f8f9fa; color: #333; }
+        .container { max-width: 1200px; margin: auto; background: white; padding: 25px; border-radius: 10px; box-shadow: 0 4px 15px rgba(0,0,0,0.1); }
+        h1 { text-align: center; color: #004d99; }
+        textarea { width: 100%; height: 200px; margin-bottom: 15px; border: 1px solid #ccc; padding: 12px; border-radius: 5px; box-sizing: border-box; font-family: monospace; font-size: 12px; }
+        .btns { text-align: center; margin-bottom: 30px; }
+        button { padding: 12px 25px; font-size: 15px; cursor: pointer; border: none; border-radius: 5px; margin: 5px; font-weight: bold; }
+        .generate { background-color: #007bff; color: white; }
+        .download { background-color: #28a745; color: white; }
+        
+        .main-header { background-color: #dee2e6; padding: 10px; font-weight: bold; text-align: center; border: 1px solid #999; border-bottom: none; font-size: 18px; }
+        table { width: 100%; border-collapse: collapse; margin-bottom: 40px; background: #fff; font-size: 13px; }
+        th, td { border: 1px solid #999; padding: 8px; text-align: center; }
+        th { background-color: #f1f3f5; font-weight: bold; }
+        .flow-name-cell { background-color: #fff3cd; text-align: left; width: 220px; font-weight: bold; padding: 15px; vertical-align: middle; }
+        .period-cell { text-align: left; width: 100px; background: #fafafa; font-weight: bold; }
+        .total-row { font-weight: bold; background-color: #e9ecef; }
+        .currency { text-align: right; padding-right: 15px; }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <h1>Klaviyo Flow Converter (Daily to Weekly)</h1>
+    <p>Paste the raw daily data including headers below:</p>
+    <textarea id="rawInput" placeholder="Day	Flow Name	Delivered	Unique Opens..."></textarea>
+    
+    <div class="btns">
+        <button class="generate" onclick="processData()">Generate Weekly Tables</button>
+        <button class="download" onclick="exportCSV()">Download CSV for Excel</button>
+    </div>
+
+    <div id="outputArea"></div>
+</div>
+
+<script>
+    // Updated to include 5 weeks
+    function getWeek(dateStr) {
+        const cleanDate = dateStr.replace(/-/g, '/');
+        const d = new Date(cleanDate);
+        const day = d.getDate();
+        if (day <= 7) return "Feb 1-7";
+        if (day <= 14) return "Feb 8-14";
+        if (day <= 21) return "Feb 15-21";
+        if (day <= 28) return "Feb 22-28";
+        return "Feb 29-31"; // Week 5
+    }
+
+    function processData() {
+        const input = document.getElementById('rawInput').value.trim();
+        if(!input) return alert("Please paste data!");
+
+        const lines = input.split('\n');
+        const headers = lines[0].split('\t').map(h => h.trim().toLowerCase());
+
+        const cols = {
+            day: headers.indexOf('day'),
+            name: headers.indexOf('flow name'),
+            delivered: headers.indexOf('delivered'),
+            opens: headers.indexOf('unique opens'),
+            clicks: headers.indexOf('unique clicks'),
+            orders: headers.indexOf('placed order'),
+            rev: headers.indexOf('revenue')
+        };
+
+        if(cols.name === -1 || cols.day === -1) {
+            return alert("Header error: 'Day' or 'Flow Name' not found.");
+        }
+
+        const dataTree = {};
+
+        for (let i = 1; i < lines.length; i++) {
+            const cells = lines[i].split('\t');
+            if (cells.length < 5) continue;
+
+            const name = cells[cols.name];
+            const week = getWeek(cells[cols.day]);
+
+            // Initialize data tree with all 5 weeks
+            if (!dataTree[name]) {
+                dataTree[name] = {
+                    "Feb 1-7": { recipients: 0, opens: 0, clicks: 0, orders: 0, revenue: 0 },
+                    "Feb 8-14": { recipients: 0, opens: 0, clicks: 0, orders: 0, revenue: 0 },
+                    "Feb 15-21": { recipients: 0, opens: 0, clicks: 0, orders: 0, revenue: 0 },
+                    "Feb 22-28": { recipients: 0, opens: 0, clicks: 0, orders: 0, revenue: 0 },
+                    "Feb 29-31": { recipients: 0, opens: 0, clicks: 0, orders: 0, revenue: 0 }
+                };
+            }
+
+            const wObj = dataTree[name][week];
+            wObj.recipients += parseInt(cells[cols.delivered]) || 0;
+            wObj.opens += parseInt(cells[cols.opens]) || 0;
+            wObj.clicks += parseInt(cells[cols.clicks]) || 0;
+            wObj.orders += parseInt(cells[cols.orders]) || 0;
+            wObj.revenue += parseFloat(cells[cols.rev].replace(/[^0-9.-]+/g,"")) || 0;
+        }
+
+        renderTables(dataTree);
+    }
+
+    function renderTables(tree) {
+        let html = '<div class="main-header">BAU Automations (Weekly)</div>';
+        // Array updated to include the 5th week
+        const weeks = ["Feb 1-7", "Feb 8-14", "Feb 15-21", "Feb 22-28", "Feb 29-31"];
+
+        for (let flowName in tree) {
+            html += `<table>
+                <thead>
+                    <tr>
+                        <th>Flow Name</th>
+                        <th>Period</th>
+                        <th>Unique Recipients</th>
+                        <th>Read/Opens</th>
+                        <th>Clicks</th>
+                        <th>Conversions</th>
+                        <th>Revenue</th>
+                        <th>AOV</th>
+                    </tr>
+                </thead>
+                <tbody>`;
+
+            let totals = { recipients: 0, opens: 0, clicks: 0, orders: 0, revenue: 0 };
+
+            weeks.forEach((w, idx) => {
+                const d = tree[flowName][w];
+                const aov = d.orders > 0 ? (d.revenue / d.orders).toFixed(0) : 0;
+                
+                html += `<tr>
+                    ${idx === 0 ? `<td class="flow-name-cell" rowspan="6">${flowName}</td>` : ''}
+                    <td class="period-cell">${w}</td>
+                    <td>${d.recipients.toLocaleString()}</td>
+                    <td>${d.opens.toLocaleString()}</td>
+                    <td>${d.clicks.toLocaleString()}</td>
+                    <td>${d.orders.toLocaleString()}</td>
+                    <td class="currency">$${d.revenue.toLocaleString(undefined, {minimumFractionDigits:2})}</td>
+                    <td>${aov}</td>
+                </tr>`;
+
+                totals.recipients += d.recipients;
+                totals.opens += d.opens;
+                totals.clicks += d.clicks;
+                totals.orders += d.orders;
+                totals.revenue += d.revenue;
+            });
+
+            const grandAov = totals.orders > 0 ? (totals.revenue / totals.orders).toFixed(0) : 0;
+            html += `<tr class="total-row">
+                <td class="period-cell">Total</td>
+                <td>${totals.recipients.toLocaleString()}</td>
+                <td>${totals.opens.toLocaleString()}</td>
+                <td>${totals.clicks.toLocaleString()}</td>
+                <td>${totals.orders.toLocaleString()}</td>
+                <td class="currency">$${totals.revenue.toLocaleString(undefined, {minimumFractionDigits:2})}</td>
+                <td>${grandAov}</td>
+            </tr></tbody></table>`;
+        }
+
+        document.getElementById('outputArea').innerHTML = html;
+    }
+
+    function exportCSV() {
+        const rows = [];
+        const tables = document.querySelectorAll('table');
+        rows.push("Flow Name,Period,Unique Recipients,Read/Opens,Clicks,Conversions,Revenue,AOV");
+
+        tables.forEach(table => {
+            const flowName = table.querySelector('.flow-name-cell').innerText;
+            const tableRows = table.querySelectorAll('tbody tr');
+            tableRows.forEach(tr => {
+                const cells = tr.querySelectorAll('td');
+                const rowData = Array.from(cells).map(td => td.innerText.replace(/[$|,]/g, ''));
+                if (rowData.length < 8) rowData.unshift(flowName);
+                rows.push(rowData.join(','));
+            });
+        });
+
+        const csvString = rows.join('\n');
+        const blob = new Blob([csvString], { type: 'text/csv' });
+        const link = document.createElement('a');
+        link.href = URL.createObjectURL(blob);
+        link.download = 'Weekly_Automation_Analysis.csv';
+        link.click();
+    }
+</script>
+
+</body>
+</html>
