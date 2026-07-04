@@ -1,0 +1,2296 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Master Performance Dashboard Workspace</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.3.2/papaparse.min.js"></script>
+    <style>
+        /* CORE GLOBAL INTERFACE LAYOUT STYLES */
+        body { margin: 0; font-family: system-ui, -apple-system, sans-serif; background-color: #111827; color: #f3f4f6; display: flex; min-height: 100vh; }
+        aside { width: 300px; background-color: #030712; padding: 24px; border-right: 1px solid #1f2937; display: flex; flex-direction: column; flex-shrink: 0; }
+        main { flex: 1; background-color: #111827; padding: 24px; overflow-y: auto; height: 100vh; box-sizing: border-box; }
+        
+        /* MODULAR APP VIEWPORT WRAPPERS */
+        .workspace-view { display: none; background: #ffffff; color: #111827; border-radius: 12px; padding: 24px; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1); margin-bottom: 2rem; }
+        .workspace-view.active { display: block; }
+        
+        /* NAVIGATION ACTIONS CONTROLS */
+        .workspace-btn { width: 100%; text-align: left; padding: 12px 16px; margin-bottom: 8px; border-radius: 8px; font-size: 14px; cursor: pointer; border: none; background: transparent; color: #9ca3af; font-weight: 500; transition: all 0.2s ease-in-out; display: flex; justify-content: space-between; align-items: center; }
+        .workspace-btn:hover { background-color: #1f2937; color: #f3f4f6; }
+        .workspace-btn.active { background-color: #2563eb; color: #ffffff; font-weight: 600; box-shadow: 0 1px 3px rgba(0,0,0,0.1); }
+        .rev-badge { font-family: monospace; font-size: 11px; background-color: rgba(255,255,255,0.1); padding: 2px 6px; border-radius: 4px; color: #34d399; font-weight: bold; }
+        .workspace-btn.active .rev-badge { background-color: rgba(255,255,255,0.2); color: #fff; }
+
+        /* ======================================================== */
+        /* INSULATED STYLES FOR INTEGRATED TOOL MODULES              */
+        /* ======================================================== */
+        /* Tool 1 & 6 Layout Setup Scopes */
+        .tool1-scope, .tool6-scope { --primary: #4f46e5; --primary-hover: #4338ca; --border: #e5e7eb; color: #1f2937; }
+        .tool1-scope .tabs, .tool6-scope .tabs { display: flex; gap: 0.25rem; margin-bottom: 1rem; border-bottom: 2px solid var(--border); padding-bottom: 2px; overflow-x: auto; }
+        .tool1-scope .tab, .tool6-scope .tab { padding: 0.5rem 1.25rem; font-size: 0.9rem; font-weight: 600; background: none; border: none; color: #6b7280; cursor: pointer; border-bottom: 2px solid transparent; margin-bottom: -4px; white-space: nowrap; }
+        .tool1-scope .tab.active, .tool6-scope .tab.active { color: var(--primary); border-bottom: 2px solid var(--primary); }
+        .tool1-scope .card, .tool6-scope .card { background: #fff; border: 1px solid var(--border); border-radius: 8px; padding: 1.5rem; margin-bottom: 1.5rem; box-shadow: 0 1px 3px rgba(0,0,0,0.05); }
+        .tool1-scope label, .tool6-scope label { display: block; font-weight: 600; margin-bottom: 0.5rem; color: #374151; }
+        .tool1-scope textarea, .tool6-scope textarea { width: 100%; height: 180px; padding: 0.75rem; border: 1px solid var(--border); border-radius: 6px; font-family: monospace; font-size: 0.875rem; box-sizing: border-box; resize: vertical; background-color: #fafafa; color: #111827; }
+        .tool1-scope textarea:focus, .tool6-scope textarea:focus { outline: 2px solid var(--primary); background-color: #fff; }
+        .tool1-scope .filter-panel, .tool6-scope .filter-panel { background: #f3f4f6; padding: 1rem; border-radius: 6px; margin-top: 1rem; display: flex; flex-wrap: wrap; gap: 1.5rem; align-items: center; }
+        .tool1-scope .filter-group, .tool6-scope .filter-group { display: flex; align-items: center; gap: 0.5rem; }
+        .tool1-scope .filter-group select, .tool1-scope .filter-group input, .tool6-scope .filter-group select, .tool6-scope .filter-group input { padding: 0.4rem 0.75rem; border: 1px solid var(--border); border-radius: 4px; background: #fff; font-size: 0.875rem; color: #111827; }
+        .tool1-scope .actions, .tool6-scope .actions { display: flex; gap: 1rem; margin-top: 1rem; }
+        .tool1-scope button, .tool6-scope button { padding: 0.75rem 1.5rem; font-size: 0.875rem; font-weight: 600; border-radius: 6px; border: none; cursor: pointer; transition: background 0.2s; }
+        .tool1-scope .btn-primary, .tool6-scope .btn-primary { background-color: var(--primary); color: white; }
+        .tool1-scope .btn-primary:hover, .tool6-scope .btn-primary:hover { background-color: var(--primary-hover); }
+        .tool1-scope .btn-secondary, .tool6-scope .btn-secondary { background-color: #fff; color: #374151; border: 1px solid var(--border); }
+        .tool1-scope .btn-secondary:hover, .tool6-scope .btn-secondary:hover { background-color: #f3f4f6; }
+        .tool1-scope .btn-secondary:disabled, .tool6-scope .btn-secondary:disabled { opacity: 0.5; cursor: not-allowed; }
+        .tool1-scope .table-container, .tool6-scope .table-container { overflow-x: auto; margin-top: 1rem; }
+        .tool1-scope table, .tool6-scope table { width: 100%; border-collapse: collapse; text-align: left; font-size: 0.875rem; }
+        .tool1-scope th, .tool6-scope th { background-color: #f3f4f6; color: #374151; font-weight: 600; padding: 0.75rem 1rem; border-bottom: 2px solid var(--border); }
+        .tool1-scope td, .tool6-scope td { padding: 0.75rem 1rem; border-bottom: 1px solid var(--border); color: #4b5563; }
+        .tool1-scope tr:hover, .tool6-scope tr:hover { background-color: #f9fafb; }
+        .tool1-scope .error, .tool6-scope .error { color: #dc2626; background-color: #fef2f2; border: 1px solid #fee2e2; padding: 0.75rem; border-radius: 6px; margin-bottom: 1rem; display: none; }
+
+        /* Tool 2 Override Adjustments (Klaviyo Structure) */
+        .tool2-scope { color: #333; }
+        .tool2-scope h1 { text-align: center; color: #004d99; font-size: 1.75rem; font-weight: bold; margin-bottom: 10px; }
+        .tool2-scope textarea { width: 100%; height: 200px; margin-bottom: 15px; border: 1px solid #ccc; padding: 12px; border-radius: 5px; box-sizing: border-box; font-family: monospace; font-size: 12px; background: #fff; color: #333; }
+        .tool2-scope .btns { text-align: center; margin-bottom: 30px; }
+        .tool2-scope button { padding: 12px 25px; font-size: 15px; cursor: pointer; border: none; border-radius: 5px; margin: 5px; font-weight: bold; }
+        .tool2-scope .generate { background-color: #007bff; color: white; }
+        .tool2-scope .download { background-color: #28a745; color: white; }
+        .tool2-scope .main-header { background-color: #dee2e6; padding: 10px; font-weight: bold; text-align: center; border: 1px solid #999; border-bottom: none; font-size: 18px; color: #111; }
+        .tool2-scope table { width: 100%; border-collapse: collapse; margin-bottom: 40px; background: #fff; font-size: 13px; }
+        .tool2-scope th, .tool2-scope td { border: 1px solid #999; padding: 8px; text-align: center; }
+        .tool2-scope th { background-color: #f1f3f5; font-weight: bold; color: #111; }
+        .tool2-scope .flow-name-cell { background-color: #fff3cd; text-align: left; width: 220px; font-weight: bold; padding: 15px; vertical-align: middle; color: #856404; }
+        .tool2-scope .period-cell { text-align: left; width: 100px; background: #fafafa; font-weight: bold; }
+        .tool2-scope .total-row { font-weight: bold; background-color: #e9ecef; }
+        .tool2-scope .currency { text-align: right; padding-right: 15px; }
+
+        /* Tool 3 Override Adjustments (Limechat Structure) */
+        .tool3-scope { color: #333; }
+        .tool3-scope h2 { color: #2c3e50; font-size: 1.5rem; font-weight: bold; margin-bottom: 0.5rem; }
+        .tool3-scope p { color: #6b7280; margin-bottom: 1rem; }
+        .tool3-scope .control-group { margin-bottom: 16px; display: flex; gap: 16px; align-items: center; }
+        .tool3-scope label { font-weight: bold; font-size: 14px; color: #374151; }
+        .tool3-scope select { padding: 8px 12px; border-radius: 4px; border: 1px solid #ccc; font-size: 14px; background-color: #fff; color: #111; }
+        .tool3-scope textarea { width: 100%; height: 180px; padding: 12px; box-sizing: border-box; border: 1px solid #ccc; border-radius: 4px; font-family: monospace; font-size: 13px; resize: vertical; margin-bottom: 16px; background-color: #fff; color: #333; }
+        .tool3-scope .btn-group { display: flex; gap: 12px; align-items: center; }
+        .tool3-scope button { border: none; padding: 12px 24px; font-size: 15px; font-weight: bold; border-radius: 4px; cursor: pointer; transition: background 0.2s; color: white; }
+        .tool3-scope .btn-generate { background-color: #2ecc71; }
+        .tool3-scope .btn-generate:hover { background-color: #27ae60; }
+        .tool3-scope .btn-download { background-color: #3498db; display: none; }
+        .tool3-scope .btn-download:hover { background-color: #2980b9; }
+        .tool3-scope table { width: 100%; border-collapse: collapse; font-size: 13px; margin-top: 24px; margin-bottom: 24px; background: white; }
+        .tool3-scope th, .tool3-scope td { border: 1px solid #bdc3c7; padding: 8px 12px; text-align: center; }
+        .tool3-scope .header-main { background-color: #dcdde1; font-weight: bold; font-size: 14px; color: #111; }
+        .tool3-scope .header-sub { background-color: #ebedf0; font-weight: bold; color: #111; }
+        .tool3-scope .flow-name-cell { background-color: #fef5d1; font-weight: bold; text-align: left; vertical-align: middle; color: #856404; }
+        .tool3-scope .row-total { font-weight: bold; background-color: #f5f6fa; color: #111; }
+
+        /* Tool 4 Override Adjustments (AIZA Structure) */
+        .tool4-scope { color: #111; }
+        .tool4-scope h1 { font-size: 1.75rem; font-weight: bold; color: #111827; margin: 0 0 0.5rem 0; }
+        .tool4-scope p { color: #6b7280; margin-bottom: 1rem; }
+        .tool4-scope textarea { width: 100%; height: 120px; margin: 10px 0; font-family: monospace; border: 1px solid #ccc; padding: 10px; box-sizing: border-box; background-color: #fff; color: #111; }
+        .tool4-scope .btn-group { margin-bottom: 20px; display: flex; gap: 10px; }
+        .tool4-scope button { padding: 10px 20px; border: none; border-radius: 4px; cursor: pointer; font-weight: bold; }
+        .tool4-scope .btn-primary { background-color: #007bff; color: white; }
+        .tool4-scope .btn-success { background-color: #28a745; color: white; display: none; }
+        .tool4-scope table { width: 100%; border-collapse: collapse; margin-top: 10px; background: #fff; font-size: 12px; }
+        .tool4-scope th, .tool4-scope td { border: 1px solid #bcbcbc; padding: 4px 6px; text-align: left; }
+        .tool4-scope th { background-color: #e2efda; font-weight: bold; text-align: center; color: #385723; }
+        .tool4-scope .total-row { background-color: #f8f9fa; font-weight: bold; color: #000; }
+        .tool4-scope .num { text-align: right; font-family: 'Consolas', monospace; }
+
+        /* Tool 5 Override Adjustments (Klaviyo Monthly Aggregator) */
+        .tool5-scope { color: #1f2937; }
+
+    </style>
+</head>
+<body>
+
+    <aside>
+        <div class="mb-6">
+            <h1 class="text-xl font-bold text-white tracking-wide">Brand Console</h1>
+            <p class="text-xs text-gray-500 mt-0.5">Unified Tool Workspace</p>
+        </div>
+        
+        <nav id="masterNavigation">
+            <button class="workspace-btn active" onclick="switchActiveWorkspace('workspaceBIK', this)">
+                <span>📊 BIK Analysis</span>
+                <span id="badge_bik" class="rev-badge hidden"></span>
+            </button>
+            <button class="workspace-btn" onclick="switchActiveWorkspace('workspaceBitespeed', this)">
+                <span>💬 Bitespeed Suite</span>
+                <span id="badge_bitespeed" class="rev-badge hidden"></span>
+            </button>
+            <button class="workspace-btn" onclick="switchActiveWorkspace('workspaceKlaviyo', this)">
+                <span>📈 Klaviyo Flow Hub</span>
+                <span id="badge_klaviyo" class="rev-badge hidden"></span>
+            </button>
+            <button class="workspace-btn" onclick="switchActiveWorkspace('workspaceLimechat', this)">
+                <span>🎧 Limechat Report Hub</span>
+                <span id="badge_limechat" class="rev-badge hidden"></span>
+            </button>
+            <button class="workspace-btn" onclick="switchActiveWorkspace('workspaceAIZA', this)">
+                <span>⚡ AIZA (WebEngage) Suite</span>
+                <span id="badge_aiza" class="rev-badge hidden"></span>
+            </button>
+            <button class="workspace-btn" onclick="switchActiveWorkspace('workspaceKlaviyoMonthly', this)">
+                <span>📅 Klaviyo Monthly Rollup</span>
+                <span id="badge_klaviyomonthly" class="rev-badge hidden"></span>
+            </button>
+            <button class="workspace-btn mt-6" onclick="switchActiveWorkspace('workspaceConfig', this)" style="border-top: 1px solid #374151; border-radius: 0 0 8px 8px; padding-top: 16px;">
+                <span>⚙️ Global Settings</span>
+            </button>
+        </nav>
+        
+        <div class="mt-auto pt-4 border-t border-gray-800 text-[11px] text-gray-600 font-mono">
+            System Status: GitHub Deployed<br>
+            Memory: Active (Local Storage)
+        </div>
+    </aside>
+
+    <main>
+        
+        <div id="workspaceBIK" class="workspace-view tool1-scope active">
+            <header class="mb-4">
+                <h1 class="text-2xl font-bold tracking-tight text-gray-900">Flow & Campaign Performance Analyzer</h1>
+                <p class="text-sm text-gray-500">Consolidate and format reporting loops. Normalize multi-channel exports into clean spreadsheet layouts.</p>
+            </header>
+
+            <div class="tabs">
+                <button class="tab active" onclick="t1_switchMode('bik', this)">BIK.ai: WhatsApp Flows</button>
+                <button class="tab" onclick="t1_switchMode('bik_campaigns', this)">BIK.ai: WhatsApp Campaigns</button>
+            </div>
+
+            <div class="card">
+                <label id="t1_inputLabel" for="t1_rawData">Paste BIK.ai Raw Journey Sheet Report Here (Include Header Row):</label>
+                <textarea id="t1_rawData" placeholder="JourneyName&#9;Channels&#9;Total Triggers&#9;Messages Sent&#9;Messages Delive..."></textarea>
+                
+                <div class="filter-panel" id="t1_dateFilterPanel" style="display:none;">
+                    <div class="filter-group">
+                        <label style="margin:0; font-size:0.875rem;">Filter Type:</label>
+                        <select id="t1_filterType" onchange="t1_toggleFilterInputs()">
+                            <option value="all">All Dates</option>
+                            <option value="month">Specific Month & Year</option>
+                            <option value="range">Custom Date Range</option>
+                        </select>
+                    </div>
+
+                    <div id="t1_monthYearFilter" class="filter-group" style="display:none;">
+                        <select id="t1_filterMonth">
+                            <option value="Jan">January</option> <option value="Feb">February</option>
+                            <option value="Mar">March</option> <option value="Apr">April</option>
+                            <option value="May">May</option> <option value="Jun">June</option>
+                            <option value="Jul">July</option> <option value="Aug">August</option>
+                            <option value="Sep">September</option> <option value="Oct">October</option>
+                            <option value="Nov">November</option> <option value="Dec">December</option>
+                        </select>
+                        <select id="t1_filterYear">
+                            <option value="2024">2024</option>
+                            <option value="2025">2025</option>
+                            <option value="2026">2026</option>
+                        </select>
+                    </div>
+
+                    <div id="t1_customRangeFilter" class="filter-group" style="display:none;">
+                        <label style="margin:0; font-size:0.875rem;">Start:</label>
+                        <input type="date" id="t1_startDate">
+                        <label style="margin:0; font-size:0.875rem;">End:</label>
+                        <input type="date" id="t1_endDate">
+                    </div>
+                </div>
+
+                <div id="t1_errorMsg" class="error"></div>
+
+                <div class="actions">
+                    <button class="btn-primary" onclick="t1_processData()">Create Report</button>
+                    <button id="t1_downloadBtn" class="btn-secondary" onclick="t1_downloadCSV()" disabled>Download CSV</button>
+                </div>
+            </div>
+
+            <div class="card" id="t1_reportCard" style="display: none;">
+                <label id="t1_outputLabel">Generated Report Output</label>
+                <div class="table-container">
+                    <table id="t1_outputTable">
+                        <thead id="t1_outputHead"></thead>
+                        <tbody id="t1_outputBody"></tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <div id="workspaceBitespeed" class="workspace-view tool6-scope">
+            <header class="mb-4">
+                <h1 class="text-2xl font-bold tracking-tight text-gray-900">Flow & Campaign Performance Analyzer</h1>
+                <p class="text-sm text-gray-500">Consolidate your tracking channels. Seamlessly normalize metrics from Bitespeed exports into structured analytical layouts.</p>
+            </header>
+
+            <div class="tabs">
+                <button class="tab active" onclick="t6_switchMode('flows', this)">Bitespeed: Automations / Flows</button>
+                <button class="tab" onclick="t6_switchMode('campaigns', this)">Bitespeed: Campaigns</button>
+            </div>
+
+            <div class="card">
+                <label id="t6_inputLabel" for="t6_rawData">Paste Flows Raw Data Here (Include Header Row):</label>
+                <textarea id="t6_rawData" placeholder="Journey name&#9;No. of unique recipients&#9;Total Revenue&#9;Clicked count..."></textarea>
+                
+                <div class="filter-panel" id="t6_dateFilterPanel">
+                    <div class="filter-group">
+                        <label style="margin:0; font-size:0.875rem;">Filter Type:</label>
+                        <select id="t6_filterType" onchange="t6_toggleFilterInputs()">
+                            <option value="all">All Dates</option>
+                            <option value="month">Specific Month & Year</option>
+                            <option value="range">Custom Date Range</option>
+                        </select>
+                    </div>
+
+                    <div id="t6_monthYearFilter" class="filter-group" style="display:none;">
+                        <select id="t6_filterMonth">
+                            <option value="Jan">January</option> <option value="Feb">February</option>
+                            <option value="Mar">March</option> <option value="Apr">April</option>
+                            <option value="May">May</option> <option value="Jun">June</option>
+                            <option value="Jul">July</option> <option value="Aug">August</option>
+                            <option value="Sep">September</option> <option value="Oct">October</option>
+                            <option value="Nov">November</option> <option value="Dec">December</option>
+                        </select>
+                        <select id="t6_filterYear">
+                            <option value="2024">2024</option>
+                            <option value="2025">2025</option>
+                            <option value="2026">2026</option>
+                        </select>
+                    </div>
+
+                    <div id="t6_customRangeFilter" class="filter-group" style="display:none;">
+                        <label style="margin:0; font-size:0.875rem;">Start:</label>
+                        <input type="date" id="t6_startDate">
+                        <label style="margin:0; font-size:0.875rem;">End:</label>
+                        <input type="date" id="t6_endDate">
+                    </div>
+                </div>
+
+                <div id="t6_errorMsg" class="error"></div>
+
+                <div class="actions">
+                    <button class="btn-primary" onclick="t6_processData()">Create Report</button>
+                    <button id="t6_downloadBtn" class="btn-secondary" onclick="t6_downloadCSV()" disabled>Download CSV</button>
+                </div>
+            </div>
+
+            <div class="card" id="t6_reportCard" style="display: none;">
+                <label id="t6_outputLabel">Generated Report Output</label>
+                <div class="table-container">
+                    <table id="t6_outputTable">
+                        <thead id="t6_outputHead"></thead>
+                        <tbody id="t6_outputBody"></tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <div id="workspaceKlaviyo" class="workspace-view tool2-scope">
+            <h1>Klaviyo Flow Converter (Daily to Weekly)</h1>
+            <p style="text-align:center; color:#666; margin-bottom:20px;">Paste the raw daily data including headers below:</p>
+            
+            <textarea id="t2_rawInput" placeholder="Day&#9;Flow Name&#9;Delivered&#9;Unique Opens..."></textarea>
+            
+            <div class="btns">
+                <button class="generate" onclick="t2_processData()">Generate Weekly Tables</button>
+                <button class="download" id="t2_downloadBtn" onclick="t2_exportCSV()">Download CSV for Excel</button>
+            </div>
+
+            <div id="t2_outputArea"></div>
+        </div>
+
+        <div id="workspaceLimechat" class="workspace-view tool3-scope">
+            <h2>Limechat Performance Aggregator</h2>
+            <p>Paste your raw daywise spreadsheet data below. The tool will automatically clean Flow IDs and sort all months and weeks chronologically (Jan to Dec).</p>
+            
+            <div class="control-group">
+                <div>
+                    <label for="t3_breakdownView">Reporting Breakdown: </label>
+                    <select id="t3_breakdownView" onchange="t3_processData()">
+                        <option value="week">Week-wise Breakdown</option>
+                        <option value="month">Month-wise Breakdown</option>
+                    </select>
+                </div>
+            </div>
+
+            <textarea id="t3_rawData" placeholder="Paste spreadsheet rows here..."></textarea>
+            <br>
+            <div class="btn-group">
+                <button class="btn-generate" onclick="t3_processData()">Generate Report Table</button>
+                <button id="t3_downloadBtn" class="btn-download" onclick="t3_downloadCSV()">Download Excel / CSV</button>
+            </div>
+
+            <div class="output-container" id="t3_reportOutput"></div>
+        </div>
+
+        <div id="workspaceAIZA" class="workspace-view tool4-scope">
+            <h1>Flow Performance Analyst</h1>
+            <p>Paste daily WebEngage data with headers. Output is sorted by Channel (WA first) and Language (EN first).</p>
+            <textarea id="t4_dataInput" placeholder="Day&#9;Campaign Name&#9;Channel&#9;Journey Name&#9;Journey ID..."></textarea>
+            
+            <div class="btn-group">
+                <button class="btn-primary" onclick="t4_process()">Process Data</button>
+                <button id="t4_dlBtn" class="btn-success" onclick="t4_downloadCSV()">Download Analysis (CSV)</button>
+            </div>
+
+            <div id="t4_output" class="overflow-x-auto"></div>
+        </div>
+
+        <div id="workspaceKlaviyoMonthly" class="workspace-view tool5-scope">
+            <h1 class="text-2xl font-bold mb-2 text-gray-800">Flow Data Aggregator</h1>
+            <p class="text-gray-600 mb-6">Upload your CSV or paste rows to get total sums grouped by <strong>Flow Name</strong>.</p>
+
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
+                <div class="border-2 border-dashed border-blue-200 p-6 rounded-lg text-center bg-gray-50 flex flex-col justify-center">
+                    <label class="block mb-2 font-semibold text-gray-700">Upload CSV File</label>
+                    <input type="file" id="t5_csvFile" accept=".csv" class="block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100">
+                </div>
+                <div class="flex flex-col">
+                    <label class="block mb-2 font-semibold text-gray-700">Or Paste Data Here</label>
+                    <textarea id="t5_pasteArea" placeholder="Paste CSV / Spreadsheet rows here..." class="flex-1 p-2 border border-gray-300 rounded-md h-24 text-sm font-mono text-gray-800 bg-gray-50"></textarea>
+                    <button onclick="t5_processPaste()" class="mt-2 bg-blue-600 text-white py-2 rounded hover:bg-blue-700 transition font-semibold">Analyze Pasted Data</button>
+                </div>
+            </div>
+
+            <div id="t5_controls" class="hidden mb-4 flex justify-between items-center border-t border-gray-100 pt-4">
+                <h2 class="text-xl font-bold text-gray-800">Analysis Results</h2>
+                <div class="space-x-2">
+                    <button onclick="t5_copyToClipboard()" class="bg-gray-200 text-gray-800 px-4 py-2 rounded hover:bg-gray-300 font-medium">Copy to Clipboard</button>
+                    <button onclick="t5_downloadCSV()" class="bg-green-600 text-white px-4 py-2 rounded hover:bg-green-700 font-medium">Download CSV</button>
+                </div>
+            </div>
+
+            <div class="overflow-x-auto border border-gray-200 rounded-lg">
+                <table id="t5_resultTable" class="min-w-full divide-y divide-gray-200 hidden">
+                    <thead class="bg-gray-50" id="t5_tableHead"></thead>
+                    <tbody class="bg-white divide-y divide-gray-200" id="t5_tableBody"></tbody>
+                </table>
+            </div>
+        </div>
+
+        <div id="workspaceConfig" class="workspace-view">
+            <header class="mb-6">
+                <h1 class="text-2xl font-bold tracking-tight text-gray-900">Global Settings & Local Memory</h1>
+                <p class="text-sm text-gray-500 mt-1">Log monthly revenue for each brand by selecting a year and month. Entries are saved to your browser's local storage and compared month-over-month. Use Flows Performance to track individual flow names and their revenue on a monthly or weekly basis.</p>
+            </header>
+
+            <div class="flex items-center gap-4 mb-6">
+                <span id="cfg_saveMsg" class="text-sm font-bold text-green-600 hidden">✓ Saved!</span>
+            </div>
+
+            <div class="space-y-4 mb-6" id="cfg_platformCards">
+                <div class="bg-gray-50 p-4 rounded-lg border border-gray-200">
+                    <h3 class="font-bold text-gray-800 mb-3">EAT Revenue</h3>
+                    <div class="flex flex-wrap items-end gap-3 mb-3">
+                        <div>
+                            <label class="block text-xs font-semibold text-gray-600 mb-1">Month</label>
+                            <select id="cfg_eat_month" class="px-3 py-2 border border-gray-300 rounded-md text-gray-800 text-sm"></select>
+                        </div>
+                        <div>
+                            <label class="block text-xs font-semibold text-gray-600 mb-1">Year</label>
+                            <select id="cfg_eat_year" class="px-3 py-2 border border-gray-300 rounded-md text-gray-800 text-sm"></select>
+                        </div>
+                        <div>
+                            <label class="block text-xs font-semibold text-gray-600 mb-1">Revenue</label>
+                            <input type="number" id="cfg_eat_revenue" placeholder="e.g. 50000" class="px-3 py-2 border border-gray-300 rounded-md text-gray-800 text-sm w-36">
+                        </div>
+                        <button onclick="saveMonthlyRevenue('eat')" class="bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700 font-semibold text-sm transition">Add / Update</button>
+                    </div>
+
+                    <div class="flex items-center gap-4 mb-2">
+                        <button onclick="togglePastHistory('eat')" id="cfg_eat_historyBtn" class="text-sm font-semibold text-blue-600 hover:text-blue-800 flex items-center gap-1">📜 Show Past History</button>
+                        <button onclick="toggleFlowsPanel('eat')" id="cfg_eat_flowsBtn" class="text-sm font-semibold text-purple-600 hover:text-purple-800 flex items-center gap-1">📊 Flows Performance</button>
+                    </div>
+
+                    <div id="cfg_eat_historyContainer" class="hidden mb-3">
+                        <div class="overflow-x-auto">
+                            <table class="min-w-full text-sm" id="cfg_eat_table">
+                                <thead><tr><th class="text-left px-2 py-1 text-gray-500 text-xs">Month</th><th class="text-right px-2 py-1 text-gray-500 text-xs">Revenue</th><th class="text-right px-2 py-1 text-gray-500 text-xs">MoM Change</th><th class="px-2 py-1"></th></tr></thead>
+                                <tbody></tbody>
+                            </table>
+                        </div>
+                        <button onclick="toggleShowAllMonths('eat')" id="cfg_eat_showAllBtn" class="text-xs text-gray-500 hover:text-gray-700 mt-2 hidden underline">Show all months</button>
+                    </div>
+
+                    <div id="cfg_eat_flowsContainer" class="hidden border-t border-gray-200 pt-3">
+                        <div class="flex items-center gap-3 mb-3">
+                            <label class="text-xs font-semibold text-gray-600">Tracking frequency:</label>
+                            <select id="cfg_eat_flowGranularity" onchange="onFlowGranularityChange('eat')" class="px-2 py-1 border border-gray-300 rounded-md text-xs">
+                                <option value="monthly">Monthly</option>
+                                <option value="weekly">Weekly</option>
+                            </select>
+                        </div>
+                        <div class="flex flex-wrap items-end gap-3 mb-3">
+                            <div>
+                                <label class="block text-xs font-semibold text-gray-600 mb-1">Flow Name</label>
+                                <input type="text" id="cfg_eat_flowName" placeholder="e.g. Welcome Series" class="px-3 py-2 border border-gray-300 rounded-md text-gray-800 text-sm w-40">
+                            </div>
+                            <div id="cfg_eat_flowPeriodInputs" class="flex items-end gap-3"></div>
+                            <div>
+                                <label class="block text-xs font-semibold text-gray-600 mb-1">Revenue</label>
+                                <input type="number" id="cfg_eat_flowRevenue" placeholder="e.g. 15000" class="px-3 py-2 border border-gray-300 rounded-md text-gray-800 text-sm w-36">
+                            </div>
+                            <button onclick="saveFlowEntry('eat')" class="bg-purple-600 text-white px-4 py-2 rounded-md hover:bg-purple-700 font-semibold text-sm transition">Add Flow</button>
+                        </div>
+                        <div class="overflow-x-auto">
+                            <table class="min-w-full text-sm" id="cfg_eat_flowsTable">
+                                <thead><tr><th class="text-left px-2 py-1 text-gray-500 text-xs">Flow Name</th><th class="text-left px-2 py-1 text-gray-500 text-xs">Period</th><th class="text-right px-2 py-1 text-gray-500 text-xs">Revenue</th><th class="px-2 py-1"></th></tr></thead>
+                                <tbody></tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+                <div class="bg-gray-50 p-4 rounded-lg border border-gray-200">
+                    <h3 class="font-bold text-gray-800 mb-3">AIZA Revenue</h3>
+                    <div class="flex flex-wrap items-end gap-3 mb-3">
+                        <div>
+                            <label class="block text-xs font-semibold text-gray-600 mb-1">Month</label>
+                            <select id="cfg_aiza_month" class="px-3 py-2 border border-gray-300 rounded-md text-gray-800 text-sm"></select>
+                        </div>
+                        <div>
+                            <label class="block text-xs font-semibold text-gray-600 mb-1">Year</label>
+                            <select id="cfg_aiza_year" class="px-3 py-2 border border-gray-300 rounded-md text-gray-800 text-sm"></select>
+                        </div>
+                        <div>
+                            <label class="block text-xs font-semibold text-gray-600 mb-1">Revenue</label>
+                            <input type="number" id="cfg_aiza_revenue" placeholder="e.g. 50000" class="px-3 py-2 border border-gray-300 rounded-md text-gray-800 text-sm w-36">
+                        </div>
+                        <button onclick="saveMonthlyRevenue('aiza')" class="bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700 font-semibold text-sm transition">Add / Update</button>
+                    </div>
+
+                    <div class="flex items-center gap-4 mb-2">
+                        <button onclick="togglePastHistory('aiza')" id="cfg_aiza_historyBtn" class="text-sm font-semibold text-blue-600 hover:text-blue-800 flex items-center gap-1">📜 Show Past History</button>
+                        <button onclick="toggleFlowsPanel('aiza')" id="cfg_aiza_flowsBtn" class="text-sm font-semibold text-purple-600 hover:text-purple-800 flex items-center gap-1">📊 Flows Performance</button>
+                    </div>
+
+                    <div id="cfg_aiza_historyContainer" class="hidden mb-3">
+                        <div class="overflow-x-auto">
+                            <table class="min-w-full text-sm" id="cfg_aiza_table">
+                                <thead><tr><th class="text-left px-2 py-1 text-gray-500 text-xs">Month</th><th class="text-right px-2 py-1 text-gray-500 text-xs">Revenue</th><th class="text-right px-2 py-1 text-gray-500 text-xs">MoM Change</th><th class="px-2 py-1"></th></tr></thead>
+                                <tbody></tbody>
+                            </table>
+                        </div>
+                        <button onclick="toggleShowAllMonths('aiza')" id="cfg_aiza_showAllBtn" class="text-xs text-gray-500 hover:text-gray-700 mt-2 hidden underline">Show all months</button>
+                    </div>
+
+                    <div id="cfg_aiza_flowsContainer" class="hidden border-t border-gray-200 pt-3">
+                        <div class="flex items-center gap-3 mb-3">
+                            <label class="text-xs font-semibold text-gray-600">Tracking frequency:</label>
+                            <select id="cfg_aiza_flowGranularity" onchange="onFlowGranularityChange('aiza')" class="px-2 py-1 border border-gray-300 rounded-md text-xs">
+                                <option value="monthly">Monthly</option>
+                                <option value="weekly">Weekly</option>
+                            </select>
+                        </div>
+                        <div class="flex flex-wrap items-end gap-3 mb-3">
+                            <div>
+                                <label class="block text-xs font-semibold text-gray-600 mb-1">Flow Name</label>
+                                <input type="text" id="cfg_aiza_flowName" placeholder="e.g. Welcome Series" class="px-3 py-2 border border-gray-300 rounded-md text-gray-800 text-sm w-40">
+                            </div>
+                            <div id="cfg_aiza_flowPeriodInputs" class="flex items-end gap-3"></div>
+                            <div>
+                                <label class="block text-xs font-semibold text-gray-600 mb-1">Revenue</label>
+                                <input type="number" id="cfg_aiza_flowRevenue" placeholder="e.g. 15000" class="px-3 py-2 border border-gray-300 rounded-md text-gray-800 text-sm w-36">
+                            </div>
+                            <button onclick="saveFlowEntry('aiza')" class="bg-purple-600 text-white px-4 py-2 rounded-md hover:bg-purple-700 font-semibold text-sm transition">Add Flow</button>
+                        </div>
+                        <div class="overflow-x-auto">
+                            <table class="min-w-full text-sm" id="cfg_aiza_flowsTable">
+                                <thead><tr><th class="text-left px-2 py-1 text-gray-500 text-xs">Flow Name</th><th class="text-left px-2 py-1 text-gray-500 text-xs">Period</th><th class="text-right px-2 py-1 text-gray-500 text-xs">Revenue</th><th class="px-2 py-1"></th></tr></thead>
+                                <tbody></tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+                <div class="bg-gray-50 p-4 rounded-lg border border-gray-200">
+                    <h3 class="font-bold text-gray-800 mb-3">SOFETCH Revenue</h3>
+                    <div class="flex flex-wrap items-end gap-3 mb-3">
+                        <div>
+                            <label class="block text-xs font-semibold text-gray-600 mb-1">Month</label>
+                            <select id="cfg_sofetch_month" class="px-3 py-2 border border-gray-300 rounded-md text-gray-800 text-sm"></select>
+                        </div>
+                        <div>
+                            <label class="block text-xs font-semibold text-gray-600 mb-1">Year</label>
+                            <select id="cfg_sofetch_year" class="px-3 py-2 border border-gray-300 rounded-md text-gray-800 text-sm"></select>
+                        </div>
+                        <div>
+                            <label class="block text-xs font-semibold text-gray-600 mb-1">Revenue</label>
+                            <input type="number" id="cfg_sofetch_revenue" placeholder="e.g. 50000" class="px-3 py-2 border border-gray-300 rounded-md text-gray-800 text-sm w-36">
+                        </div>
+                        <button onclick="saveMonthlyRevenue('sofetch')" class="bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700 font-semibold text-sm transition">Add / Update</button>
+                    </div>
+
+                    <div class="flex items-center gap-4 mb-2">
+                        <button onclick="togglePastHistory('sofetch')" id="cfg_sofetch_historyBtn" class="text-sm font-semibold text-blue-600 hover:text-blue-800 flex items-center gap-1">📜 Show Past History</button>
+                        <button onclick="toggleFlowsPanel('sofetch')" id="cfg_sofetch_flowsBtn" class="text-sm font-semibold text-purple-600 hover:text-purple-800 flex items-center gap-1">📊 Flows Performance</button>
+                    </div>
+
+                    <div id="cfg_sofetch_historyContainer" class="hidden mb-3">
+                        <div class="overflow-x-auto">
+                            <table class="min-w-full text-sm" id="cfg_sofetch_table">
+                                <thead><tr><th class="text-left px-2 py-1 text-gray-500 text-xs">Month</th><th class="text-right px-2 py-1 text-gray-500 text-xs">Revenue</th><th class="text-right px-2 py-1 text-gray-500 text-xs">MoM Change</th><th class="px-2 py-1"></th></tr></thead>
+                                <tbody></tbody>
+                            </table>
+                        </div>
+                        <button onclick="toggleShowAllMonths('sofetch')" id="cfg_sofetch_showAllBtn" class="text-xs text-gray-500 hover:text-gray-700 mt-2 hidden underline">Show all months</button>
+                    </div>
+
+                    <div id="cfg_sofetch_flowsContainer" class="hidden border-t border-gray-200 pt-3">
+                        <div class="flex items-center gap-3 mb-3">
+                            <label class="text-xs font-semibold text-gray-600">Tracking frequency:</label>
+                            <select id="cfg_sofetch_flowGranularity" onchange="onFlowGranularityChange('sofetch')" class="px-2 py-1 border border-gray-300 rounded-md text-xs">
+                                <option value="monthly">Monthly</option>
+                                <option value="weekly">Weekly</option>
+                            </select>
+                        </div>
+                        <div class="flex flex-wrap items-end gap-3 mb-3">
+                            <div>
+                                <label class="block text-xs font-semibold text-gray-600 mb-1">Flow Name</label>
+                                <input type="text" id="cfg_sofetch_flowName" placeholder="e.g. Welcome Series" class="px-3 py-2 border border-gray-300 rounded-md text-gray-800 text-sm w-40">
+                            </div>
+                            <div id="cfg_sofetch_flowPeriodInputs" class="flex items-end gap-3"></div>
+                            <div>
+                                <label class="block text-xs font-semibold text-gray-600 mb-1">Revenue</label>
+                                <input type="number" id="cfg_sofetch_flowRevenue" placeholder="e.g. 15000" class="px-3 py-2 border border-gray-300 rounded-md text-gray-800 text-sm w-36">
+                            </div>
+                            <button onclick="saveFlowEntry('sofetch')" class="bg-purple-600 text-white px-4 py-2 rounded-md hover:bg-purple-700 font-semibold text-sm transition">Add Flow</button>
+                        </div>
+                        <div class="overflow-x-auto">
+                            <table class="min-w-full text-sm" id="cfg_sofetch_flowsTable">
+                                <thead><tr><th class="text-left px-2 py-1 text-gray-500 text-xs">Flow Name</th><th class="text-left px-2 py-1 text-gray-500 text-xs">Period</th><th class="text-right px-2 py-1 text-gray-500 text-xs">Revenue</th><th class="px-2 py-1"></th></tr></thead>
+                                <tbody></tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+                <div class="bg-gray-50 p-4 rounded-lg border border-gray-200">
+                    <h3 class="font-bold text-gray-800 mb-3">LYH Revenue</h3>
+                    <div class="flex flex-wrap items-end gap-3 mb-3">
+                        <div>
+                            <label class="block text-xs font-semibold text-gray-600 mb-1">Month</label>
+                            <select id="cfg_lyh_month" class="px-3 py-2 border border-gray-300 rounded-md text-gray-800 text-sm"></select>
+                        </div>
+                        <div>
+                            <label class="block text-xs font-semibold text-gray-600 mb-1">Year</label>
+                            <select id="cfg_lyh_year" class="px-3 py-2 border border-gray-300 rounded-md text-gray-800 text-sm"></select>
+                        </div>
+                        <div>
+                            <label class="block text-xs font-semibold text-gray-600 mb-1">Revenue</label>
+                            <input type="number" id="cfg_lyh_revenue" placeholder="e.g. 50000" class="px-3 py-2 border border-gray-300 rounded-md text-gray-800 text-sm w-36">
+                        </div>
+                        <button onclick="saveMonthlyRevenue('lyh')" class="bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700 font-semibold text-sm transition">Add / Update</button>
+                    </div>
+
+                    <div class="flex items-center gap-4 mb-2">
+                        <button onclick="togglePastHistory('lyh')" id="cfg_lyh_historyBtn" class="text-sm font-semibold text-blue-600 hover:text-blue-800 flex items-center gap-1">📜 Show Past History</button>
+                        <button onclick="toggleFlowsPanel('lyh')" id="cfg_lyh_flowsBtn" class="text-sm font-semibold text-purple-600 hover:text-purple-800 flex items-center gap-1">📊 Flows Performance</button>
+                    </div>
+
+                    <div id="cfg_lyh_historyContainer" class="hidden mb-3">
+                        <div class="overflow-x-auto">
+                            <table class="min-w-full text-sm" id="cfg_lyh_table">
+                                <thead><tr><th class="text-left px-2 py-1 text-gray-500 text-xs">Month</th><th class="text-right px-2 py-1 text-gray-500 text-xs">Revenue</th><th class="text-right px-2 py-1 text-gray-500 text-xs">MoM Change</th><th class="px-2 py-1"></th></tr></thead>
+                                <tbody></tbody>
+                            </table>
+                        </div>
+                        <button onclick="toggleShowAllMonths('lyh')" id="cfg_lyh_showAllBtn" class="text-xs text-gray-500 hover:text-gray-700 mt-2 hidden underline">Show all months</button>
+                    </div>
+
+                    <div id="cfg_lyh_flowsContainer" class="hidden border-t border-gray-200 pt-3">
+                        <div class="flex items-center gap-3 mb-3">
+                            <label class="text-xs font-semibold text-gray-600">Tracking frequency:</label>
+                            <select id="cfg_lyh_flowGranularity" onchange="onFlowGranularityChange('lyh')" class="px-2 py-1 border border-gray-300 rounded-md text-xs">
+                                <option value="monthly">Monthly</option>
+                                <option value="weekly">Weekly</option>
+                            </select>
+                        </div>
+                        <div class="flex flex-wrap items-end gap-3 mb-3">
+                            <div>
+                                <label class="block text-xs font-semibold text-gray-600 mb-1">Flow Name</label>
+                                <input type="text" id="cfg_lyh_flowName" placeholder="e.g. Welcome Series" class="px-3 py-2 border border-gray-300 rounded-md text-gray-800 text-sm w-40">
+                            </div>
+                            <div id="cfg_lyh_flowPeriodInputs" class="flex items-end gap-3"></div>
+                            <div>
+                                <label class="block text-xs font-semibold text-gray-600 mb-1">Revenue</label>
+                                <input type="number" id="cfg_lyh_flowRevenue" placeholder="e.g. 15000" class="px-3 py-2 border border-gray-300 rounded-md text-gray-800 text-sm w-36">
+                            </div>
+                            <button onclick="saveFlowEntry('lyh')" class="bg-purple-600 text-white px-4 py-2 rounded-md hover:bg-purple-700 font-semibold text-sm transition">Add Flow</button>
+                        </div>
+                        <div class="overflow-x-auto">
+                            <table class="min-w-full text-sm" id="cfg_lyh_flowsTable">
+                                <thead><tr><th class="text-left px-2 py-1 text-gray-500 text-xs">Flow Name</th><th class="text-left px-2 py-1 text-gray-500 text-xs">Period</th><th class="text-right px-2 py-1 text-gray-500 text-xs">Revenue</th><th class="px-2 py-1"></th></tr></thead>
+                                <tbody></tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+                <div class="bg-gray-50 p-4 rounded-lg border border-gray-200">
+                    <h3 class="font-bold text-gray-800 mb-3">CAI Revenue</h3>
+                    <div class="flex flex-wrap items-end gap-3 mb-3">
+                        <div>
+                            <label class="block text-xs font-semibold text-gray-600 mb-1">Month</label>
+                            <select id="cfg_cai_month" class="px-3 py-2 border border-gray-300 rounded-md text-gray-800 text-sm"></select>
+                        </div>
+                        <div>
+                            <label class="block text-xs font-semibold text-gray-600 mb-1">Year</label>
+                            <select id="cfg_cai_year" class="px-3 py-2 border border-gray-300 rounded-md text-gray-800 text-sm"></select>
+                        </div>
+                        <div>
+                            <label class="block text-xs font-semibold text-gray-600 mb-1">Revenue</label>
+                            <input type="number" id="cfg_cai_revenue" placeholder="e.g. 50000" class="px-3 py-2 border border-gray-300 rounded-md text-gray-800 text-sm w-36">
+                        </div>
+                        <button onclick="saveMonthlyRevenue('cai')" class="bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700 font-semibold text-sm transition">Add / Update</button>
+                    </div>
+
+                    <div class="flex items-center gap-4 mb-2">
+                        <button onclick="togglePastHistory('cai')" id="cfg_cai_historyBtn" class="text-sm font-semibold text-blue-600 hover:text-blue-800 flex items-center gap-1">📜 Show Past History</button>
+                        <button onclick="toggleFlowsPanel('cai')" id="cfg_cai_flowsBtn" class="text-sm font-semibold text-purple-600 hover:text-purple-800 flex items-center gap-1">📊 Flows Performance</button>
+                    </div>
+
+                    <div id="cfg_cai_historyContainer" class="hidden mb-3">
+                        <div class="overflow-x-auto">
+                            <table class="min-w-full text-sm" id="cfg_cai_table">
+                                <thead><tr><th class="text-left px-2 py-1 text-gray-500 text-xs">Month</th><th class="text-right px-2 py-1 text-gray-500 text-xs">Revenue</th><th class="text-right px-2 py-1 text-gray-500 text-xs">MoM Change</th><th class="px-2 py-1"></th></tr></thead>
+                                <tbody></tbody>
+                            </table>
+                        </div>
+                        <button onclick="toggleShowAllMonths('cai')" id="cfg_cai_showAllBtn" class="text-xs text-gray-500 hover:text-gray-700 mt-2 hidden underline">Show all months</button>
+                    </div>
+
+                    <div id="cfg_cai_flowsContainer" class="hidden border-t border-gray-200 pt-3">
+                        <div class="flex items-center gap-3 mb-3">
+                            <label class="text-xs font-semibold text-gray-600">Tracking frequency:</label>
+                            <select id="cfg_cai_flowGranularity" onchange="onFlowGranularityChange('cai')" class="px-2 py-1 border border-gray-300 rounded-md text-xs">
+                                <option value="monthly">Monthly</option>
+                                <option value="weekly">Weekly</option>
+                            </select>
+                        </div>
+                        <div class="flex flex-wrap items-end gap-3 mb-3">
+                            <div>
+                                <label class="block text-xs font-semibold text-gray-600 mb-1">Flow Name</label>
+                                <input type="text" id="cfg_cai_flowName" placeholder="e.g. Welcome Series" class="px-3 py-2 border border-gray-300 rounded-md text-gray-800 text-sm w-40">
+                            </div>
+                            <div id="cfg_cai_flowPeriodInputs" class="flex items-end gap-3"></div>
+                            <div>
+                                <label class="block text-xs font-semibold text-gray-600 mb-1">Revenue</label>
+                                <input type="number" id="cfg_cai_flowRevenue" placeholder="e.g. 15000" class="px-3 py-2 border border-gray-300 rounded-md text-gray-800 text-sm w-36">
+                            </div>
+                            <button onclick="saveFlowEntry('cai')" class="bg-purple-600 text-white px-4 py-2 rounded-md hover:bg-purple-700 font-semibold text-sm transition">Add Flow</button>
+                        </div>
+                        <div class="overflow-x-auto">
+                            <table class="min-w-full text-sm" id="cfg_cai_flowsTable">
+                                <thead><tr><th class="text-left px-2 py-1 text-gray-500 text-xs">Flow Name</th><th class="text-left px-2 py-1 text-gray-500 text-xs">Period</th><th class="text-right px-2 py-1 text-gray-500 text-xs">Revenue</th><th class="px-2 py-1"></th></tr></thead>
+                                <tbody></tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+                <div class="bg-gray-50 p-4 rounded-lg border border-gray-200">
+                    <h3 class="font-bold text-gray-800 mb-3">ONE EMPIRE Revenue</h3>
+                    <div class="flex flex-wrap items-end gap-3 mb-3">
+                        <div>
+                            <label class="block text-xs font-semibold text-gray-600 mb-1">Month</label>
+                            <select id="cfg_oneempire_month" class="px-3 py-2 border border-gray-300 rounded-md text-gray-800 text-sm"></select>
+                        </div>
+                        <div>
+                            <label class="block text-xs font-semibold text-gray-600 mb-1">Year</label>
+                            <select id="cfg_oneempire_year" class="px-3 py-2 border border-gray-300 rounded-md text-gray-800 text-sm"></select>
+                        </div>
+                        <div>
+                            <label class="block text-xs font-semibold text-gray-600 mb-1">Revenue</label>
+                            <input type="number" id="cfg_oneempire_revenue" placeholder="e.g. 50000" class="px-3 py-2 border border-gray-300 rounded-md text-gray-800 text-sm w-36">
+                        </div>
+                        <button onclick="saveMonthlyRevenue('oneempire')" class="bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700 font-semibold text-sm transition">Add / Update</button>
+                    </div>
+
+                    <div class="flex items-center gap-4 mb-2">
+                        <button onclick="togglePastHistory('oneempire')" id="cfg_oneempire_historyBtn" class="text-sm font-semibold text-blue-600 hover:text-blue-800 flex items-center gap-1">📜 Show Past History</button>
+                        <button onclick="toggleFlowsPanel('oneempire')" id="cfg_oneempire_flowsBtn" class="text-sm font-semibold text-purple-600 hover:text-purple-800 flex items-center gap-1">📊 Flows Performance</button>
+                    </div>
+
+                    <div id="cfg_oneempire_historyContainer" class="hidden mb-3">
+                        <div class="overflow-x-auto">
+                            <table class="min-w-full text-sm" id="cfg_oneempire_table">
+                                <thead><tr><th class="text-left px-2 py-1 text-gray-500 text-xs">Month</th><th class="text-right px-2 py-1 text-gray-500 text-xs">Revenue</th><th class="text-right px-2 py-1 text-gray-500 text-xs">MoM Change</th><th class="px-2 py-1"></th></tr></thead>
+                                <tbody></tbody>
+                            </table>
+                        </div>
+                        <button onclick="toggleShowAllMonths('oneempire')" id="cfg_oneempire_showAllBtn" class="text-xs text-gray-500 hover:text-gray-700 mt-2 hidden underline">Show all months</button>
+                    </div>
+
+                    <div id="cfg_oneempire_flowsContainer" class="hidden border-t border-gray-200 pt-3">
+                        <div class="flex items-center gap-3 mb-3">
+                            <label class="text-xs font-semibold text-gray-600">Tracking frequency:</label>
+                            <select id="cfg_oneempire_flowGranularity" onchange="onFlowGranularityChange('oneempire')" class="px-2 py-1 border border-gray-300 rounded-md text-xs">
+                                <option value="monthly">Monthly</option>
+                                <option value="weekly">Weekly</option>
+                            </select>
+                        </div>
+                        <div class="flex flex-wrap items-end gap-3 mb-3">
+                            <div>
+                                <label class="block text-xs font-semibold text-gray-600 mb-1">Flow Name</label>
+                                <input type="text" id="cfg_oneempire_flowName" placeholder="e.g. Welcome Series" class="px-3 py-2 border border-gray-300 rounded-md text-gray-800 text-sm w-40">
+                            </div>
+                            <div id="cfg_oneempire_flowPeriodInputs" class="flex items-end gap-3"></div>
+                            <div>
+                                <label class="block text-xs font-semibold text-gray-600 mb-1">Revenue</label>
+                                <input type="number" id="cfg_oneempire_flowRevenue" placeholder="e.g. 15000" class="px-3 py-2 border border-gray-300 rounded-md text-gray-800 text-sm w-36">
+                            </div>
+                            <button onclick="saveFlowEntry('oneempire')" class="bg-purple-600 text-white px-4 py-2 rounded-md hover:bg-purple-700 font-semibold text-sm transition">Add Flow</button>
+                        </div>
+                        <div class="overflow-x-auto">
+                            <table class="min-w-full text-sm" id="cfg_oneempire_flowsTable">
+                                <thead><tr><th class="text-left px-2 py-1 text-gray-500 text-xs">Flow Name</th><th class="text-left px-2 py-1 text-gray-500 text-xs">Period</th><th class="text-right px-2 py-1 text-gray-500 text-xs">Revenue</th><th class="px-2 py-1"></th></tr></thead>
+                                <tbody></tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+                <div class="bg-gray-50 p-4 rounded-lg border border-gray-200">
+                    <h3 class="font-bold text-gray-800 mb-3">INDEWILD Revenue</h3>
+                    <div class="flex flex-wrap items-end gap-3 mb-3">
+                        <div>
+                            <label class="block text-xs font-semibold text-gray-600 mb-1">Month</label>
+                            <select id="cfg_indewild_month" class="px-3 py-2 border border-gray-300 rounded-md text-gray-800 text-sm"></select>
+                        </div>
+                        <div>
+                            <label class="block text-xs font-semibold text-gray-600 mb-1">Year</label>
+                            <select id="cfg_indewild_year" class="px-3 py-2 border border-gray-300 rounded-md text-gray-800 text-sm"></select>
+                        </div>
+                        <div>
+                            <label class="block text-xs font-semibold text-gray-600 mb-1">Revenue</label>
+                            <input type="number" id="cfg_indewild_revenue" placeholder="e.g. 50000" class="px-3 py-2 border border-gray-300 rounded-md text-gray-800 text-sm w-36">
+                        </div>
+                        <button onclick="saveMonthlyRevenue('indewild')" class="bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700 font-semibold text-sm transition">Add / Update</button>
+                    </div>
+
+                    <div class="flex items-center gap-4 mb-2">
+                        <button onclick="togglePastHistory('indewild')" id="cfg_indewild_historyBtn" class="text-sm font-semibold text-blue-600 hover:text-blue-800 flex items-center gap-1">📜 Show Past History</button>
+                        <button onclick="toggleFlowsPanel('indewild')" id="cfg_indewild_flowsBtn" class="text-sm font-semibold text-purple-600 hover:text-purple-800 flex items-center gap-1">📊 Flows Performance</button>
+                    </div>
+
+                    <div id="cfg_indewild_historyContainer" class="hidden mb-3">
+                        <div class="overflow-x-auto">
+                            <table class="min-w-full text-sm" id="cfg_indewild_table">
+                                <thead><tr><th class="text-left px-2 py-1 text-gray-500 text-xs">Month</th><th class="text-right px-2 py-1 text-gray-500 text-xs">Revenue</th><th class="text-right px-2 py-1 text-gray-500 text-xs">MoM Change</th><th class="px-2 py-1"></th></tr></thead>
+                                <tbody></tbody>
+                            </table>
+                        </div>
+                        <button onclick="toggleShowAllMonths('indewild')" id="cfg_indewild_showAllBtn" class="text-xs text-gray-500 hover:text-gray-700 mt-2 hidden underline">Show all months</button>
+                    </div>
+
+                    <div id="cfg_indewild_flowsContainer" class="hidden border-t border-gray-200 pt-3">
+                        <div class="flex items-center gap-3 mb-3">
+                            <label class="text-xs font-semibold text-gray-600">Tracking frequency:</label>
+                            <select id="cfg_indewild_flowGranularity" onchange="onFlowGranularityChange('indewild')" class="px-2 py-1 border border-gray-300 rounded-md text-xs">
+                                <option value="monthly">Monthly</option>
+                                <option value="weekly">Weekly</option>
+                            </select>
+                        </div>
+                        <div class="flex flex-wrap items-end gap-3 mb-3">
+                            <div>
+                                <label class="block text-xs font-semibold text-gray-600 mb-1">Flow Name</label>
+                                <input type="text" id="cfg_indewild_flowName" placeholder="e.g. Welcome Series" class="px-3 py-2 border border-gray-300 rounded-md text-gray-800 text-sm w-40">
+                            </div>
+                            <div id="cfg_indewild_flowPeriodInputs" class="flex items-end gap-3"></div>
+                            <div>
+                                <label class="block text-xs font-semibold text-gray-600 mb-1">Revenue</label>
+                                <input type="number" id="cfg_indewild_flowRevenue" placeholder="e.g. 15000" class="px-3 py-2 border border-gray-300 rounded-md text-gray-800 text-sm w-36">
+                            </div>
+                            <button onclick="saveFlowEntry('indewild')" class="bg-purple-600 text-white px-4 py-2 rounded-md hover:bg-purple-700 font-semibold text-sm transition">Add Flow</button>
+                        </div>
+                        <div class="overflow-x-auto">
+                            <table class="min-w-full text-sm" id="cfg_indewild_flowsTable">
+                                <thead><tr><th class="text-left px-2 py-1 text-gray-500 text-xs">Flow Name</th><th class="text-left px-2 py-1 text-gray-500 text-xs">Period</th><th class="text-right px-2 py-1 text-gray-500 text-xs">Revenue</th><th class="px-2 py-1"></th></tr></thead>
+                                <tbody></tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+    </main>
+
+    <script>
+        // MASTER STRUCTURAL WORKSPACE SWITCHER
+        function switchActiveWorkspace(targetId, btnControl) {
+            const views = document.querySelectorAll('.workspace-view');
+            views.forEach(v => v.classList.remove('active'));
+            
+            const navButtons = document.querySelectorAll('#masterNavigation .workspace-btn');
+            navButtons.forEach(b => b.classList.remove('active'));
+            
+            document.getElementById(targetId).classList.add('active');
+            btnControl.classList.add('active');
+        }
+
+        // ========================================================
+        // ENGINE EXECUTION RUNTIMES: MONTHLY REVENUE MEMORY SYSTEM (NEW)
+        // ========================================================
+        const REVENUE_PLATFORMS = ['eat', 'aiza', 'sofetch', 'lyh', 'cai', 'oneempire', 'indewild'];
+        const MONTH_NAMES = ['January','February','March','April','May','June','July','August','September','October','November','December'];
+        let monthlyRevenueData = {};
+        let revenueUIState = {}; // { eat: { visible: false, showAll: false }, ... }
+        let flowsData = {}; // { eat: { granularity: 'monthly', entries: [...] }, ... }
+
+        function initRevenueYearMonthSelectors() {
+            const thisYear = new Date().getFullYear();
+            const thisMonth = new Date().getMonth() + 1;
+            REVENUE_PLATFORMS.forEach(key => {
+                const monthSel = document.getElementById(`cfg_${key}_month`);
+                const yearSel = document.getElementById(`cfg_${key}_year`);
+                if (!monthSel || !yearSel) return;
+                monthSel.innerHTML = MONTH_NAMES.map((m, i) => `<option value="${i + 1}">${m}</option>`).join('');
+                let yearOpts = '';
+                for (let y = thisYear - 3; y <= thisYear + 2; y++) {
+                    yearOpts += `<option value="${y}" ${y === thisYear ? 'selected' : ''}>${y}</option>`;
+                }
+                yearSel.innerHTML = yearOpts;
+                monthSel.value = thisMonth;
+            });
+        }
+
+        function randomDemoRevenue() {
+            // Random revenue, always above ₹50,000
+            return Math.floor(Math.random() * (500000 - 50000 + 1)) + 50000;
+        }
+
+        function seedDemoDataIfEmpty() {
+            const now = new Date();
+            let didSeed = false;
+            REVENUE_PLATFORMS.forEach(key => {
+                if (!monthlyRevenueData[key]) monthlyRevenueData[key] = {};
+                if (Object.keys(monthlyRevenueData[key]).length === 0) {
+                    for (let i = 5; i >= 0; i--) {
+                        const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
+                        const mkey = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+                        monthlyRevenueData[key][mkey] = randomDemoRevenue();
+                    }
+                    didSeed = true;
+                }
+            });
+            if (didSeed) persistMonthlyRevenueData();
+        }
+
+        function loadMonthlyRevenueData() {
+            const saved = localStorage.getItem('brandConsoleMonthlyRevenue');
+            monthlyRevenueData = saved ? JSON.parse(saved) : {};
+            REVENUE_PLATFORMS.forEach(key => {
+                if (!monthlyRevenueData[key]) monthlyRevenueData[key] = {};
+                if (!revenueUIState[key]) revenueUIState[key] = { visible: false, showAll: false };
+            });
+            seedDemoDataIfEmpty();
+            REVENUE_PLATFORMS.forEach(key => {
+                renderRevenueTable(key);
+                updateBadgeForCurrentMonth(key);
+            });
+        }
+
+        function persistMonthlyRevenueData() {
+            localStorage.setItem('brandConsoleMonthlyRevenue', JSON.stringify(monthlyRevenueData));
+        }
+
+        function saveMonthlyRevenue(platformKey) {
+            const month = parseInt(document.getElementById(`cfg_${platformKey}_month`).value, 10);
+            const year = parseInt(document.getElementById(`cfg_${platformKey}_year`).value, 10);
+            const revenueInput = document.getElementById(`cfg_${platformKey}_revenue`);
+            const revenue = parseFloat(revenueInput.value);
+
+            if (isNaN(revenue)) {
+                alert('Please enter a valid revenue number.');
+                return;
+            }
+
+            const key = `${year}-${String(month).padStart(2, '0')}`;
+            monthlyRevenueData[platformKey][key] = revenue;
+            persistMonthlyRevenueData();
+            renderRevenueTable(platformKey);
+            updateBadgeForCurrentMonth(platformKey);
+            revenueInput.value = '';
+
+            const msg = document.getElementById('cfg_saveMsg');
+            msg.classList.remove('hidden');
+            setTimeout(() => { msg.classList.add('hidden'); }, 2500);
+        }
+
+        function deleteMonthlyRevenue(platformKey, monthKey) {
+            delete monthlyRevenueData[platformKey][monthKey];
+            persistMonthlyRevenueData();
+            renderRevenueTable(platformKey);
+            updateBadgeForCurrentMonth(platformKey);
+        }
+
+        function formatRevenue(value) {
+            return '₹' + Number(value).toLocaleString('en-IN', { maximumFractionDigits: 0 });
+        }
+
+        function formatCompactRevenue(value) {
+            const n = Number(value);
+            const sign = n < 0 ? '-' : '';
+            const abs = Math.abs(n);
+            if (abs >= 10000000) return sign + '₹' + (abs / 10000000).toFixed(1) + 'Cr';
+            if (abs >= 100000) return sign + '₹' + (abs / 100000).toFixed(1) + 'L';
+            if (abs >= 1000) return sign + '₹' + (abs / 1000).toFixed(1) + 'K';
+            return sign + '₹' + abs.toFixed(0);
+        }
+
+        function monthKeyToLabel(key) {
+            const [y, m] = key.split('-');
+            return `${MONTH_NAMES[parseInt(m, 10) - 1].slice(0, 3)} ${y}`;
+        }
+
+        function togglePastHistory(platformKey) {
+            const container = document.getElementById(`cfg_${platformKey}_historyContainer`);
+            const btn = document.getElementById(`cfg_${platformKey}_historyBtn`);
+            if (!container) return;
+            revenueUIState[platformKey].visible = !revenueUIState[platformKey].visible;
+            container.classList.toggle('hidden', !revenueUIState[platformKey].visible);
+            if (btn) btn.innerText = revenueUIState[platformKey].visible ? '📜 Hide Past History' : '📜 Show Past History';
+            if (revenueUIState[platformKey].visible) renderRevenueTable(platformKey);
+        }
+
+        function toggleShowAllMonths(platformKey) {
+            revenueUIState[platformKey].showAll = !revenueUIState[platformKey].showAll;
+            renderRevenueTable(platformKey);
+        }
+
+        function renderRevenueTable(platformKey) {
+            const tbody = document.querySelector(`#cfg_${platformKey}_table tbody`);
+            if (!tbody) return;
+            const entries = Object.entries(monthlyRevenueData[platformKey] || {}).sort((a, b) => a[0].localeCompare(b[0]));
+
+            if (entries.length === 0) {
+                tbody.innerHTML = `<tr><td colspan="4" class="text-center text-gray-400 py-3 text-xs">No monthly data yet</td></tr>`;
+                const showAllBtn = document.getElementById(`cfg_${platformKey}_showAllBtn`);
+                if (showAllBtn) showAllBtn.classList.add('hidden');
+                return;
+            }
+
+            const state = revenueUIState[platformKey] || { showAll: false };
+            const HISTORY_LIMIT = 6;
+            const displayEntries = state.showAll ? entries : entries.slice(-HISTORY_LIMIT);
+
+            let rowsHtml = '';
+            displayEntries.slice().reverse().forEach(([key, value]) => {
+                const chronoIdx = entries.findIndex(e => e[0] === key);
+                const prev = chronoIdx > 0 ? entries[chronoIdx - 1][1] : null;
+                let changeHtml = '<span class="text-gray-400">-</span>';
+                if (prev !== null && prev !== 0) {
+                    const pct = ((value - prev) / prev) * 100;
+                    const cls = pct > 0 ? 'text-green-600' : (pct < 0 ? 'text-red-600' : 'text-gray-500');
+                    changeHtml = `<span class="${cls} font-semibold">${pct > 0 ? '+' : ''}${pct.toFixed(1)}%</span>`;
+                }
+                rowsHtml += `
+                    <tr class="border-b border-gray-100">
+                        <td class="px-2 py-2 text-gray-700">${monthKeyToLabel(key)}</td>
+                        <td class="px-2 py-2 text-right text-gray-800 font-medium">${formatRevenue(value)}</td>
+                        <td class="px-2 py-2 text-right">${changeHtml}</td>
+                        <td class="px-2 py-1 text-right">
+                            <button onclick="deleteMonthlyRevenue('${platformKey}','${key}')" class="text-red-500 hover:text-red-700 text-xs font-bold">✕</button>
+                        </td>
+                    </tr>
+                `;
+            });
+            tbody.innerHTML = rowsHtml;
+
+            const showAllBtn = document.getElementById(`cfg_${platformKey}_showAllBtn`);
+            if (showAllBtn) {
+                if (entries.length > HISTORY_LIMIT) {
+                    showAllBtn.classList.remove('hidden');
+                    showAllBtn.innerText = state.showAll ? `Show only last ${HISTORY_LIMIT} months` : `Show all ${entries.length} months`;
+                } else {
+                    showAllBtn.classList.add('hidden');
+                }
+            }
+        }
+
+        function updateBadgeForCurrentMonth(platformKey) {
+            const now = new Date();
+            const key = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+            const badge = document.getElementById(`badge_${platformKey}`);
+            if (!badge) return;
+            const value = monthlyRevenueData[platformKey] ? monthlyRevenueData[platformKey][key] : undefined;
+            if (value !== undefined && value !== null) {
+                badge.innerText = formatCompactRevenue(value);
+                badge.classList.remove('hidden');
+            } else {
+                badge.classList.add('hidden');
+            }
+        }
+
+        // ========================================================
+        // ENGINE EXECUTION RUNTIMES: FLOWS PERFORMANCE (NEW)
+        // ========================================================
+        function loadFlowsData() {
+            const saved = localStorage.getItem('brandConsoleFlowsData');
+            flowsData = saved ? JSON.parse(saved) : {};
+            REVENUE_PLATFORMS.forEach(key => {
+                if (!flowsData[key]) flowsData[key] = { granularity: 'monthly', entries: [] };
+            });
+        }
+
+        function persistFlowsData() {
+            localStorage.setItem('brandConsoleFlowsData', JSON.stringify(flowsData));
+        }
+
+        function toggleFlowsPanel(key) {
+            const container = document.getElementById(`cfg_${key}_flowsContainer`);
+            const btn = document.getElementById(`cfg_${key}_flowsBtn`);
+            if (!container) return;
+            const willShow = container.classList.contains('hidden');
+            container.classList.toggle('hidden');
+            if (btn) btn.innerText = willShow ? '📊 Hide Flows Performance' : '📊 Flows Performance';
+            if (willShow) {
+                const granSel = document.getElementById(`cfg_${key}_flowGranularity`);
+                if (granSel) granSel.value = flowsData[key] ? flowsData[key].granularity : 'monthly';
+                initFlowPeriodInputs(key);
+                renderFlowsTable(key);
+            }
+        }
+
+        function onFlowGranularityChange(key) {
+            const granularity = document.getElementById(`cfg_${key}_flowGranularity`).value;
+            if (!flowsData[key]) flowsData[key] = { granularity, entries: [] };
+            flowsData[key].granularity = granularity;
+            persistFlowsData();
+            initFlowPeriodInputs(key);
+        }
+
+        function initFlowPeriodInputs(key) {
+            const granularity = document.getElementById(`cfg_${key}_flowGranularity`).value;
+            const container = document.getElementById(`cfg_${key}_flowPeriodInputs`);
+            if (!container) return;
+            const thisYear = new Date().getFullYear();
+
+            if (granularity === 'weekly') {
+                container.innerHTML = `
+                    <div>
+                        <label class="block text-xs font-semibold text-gray-600 mb-1">Week #</label>
+                        <input type="number" id="cfg_${key}_flowWeek" min="1" max="53" placeholder="1-53" class="px-3 py-2 border border-gray-300 rounded-md text-gray-800 text-sm w-20">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-semibold text-gray-600 mb-1">Year</label>
+                        <select id="cfg_${key}_flowYear" class="px-3 py-2 border border-gray-300 rounded-md text-gray-800 text-sm"></select>
+                    </div>
+                `;
+                const yearSel = document.getElementById(`cfg_${key}_flowYear`);
+                let yearOpts = '';
+                for (let y = thisYear - 3; y <= thisYear + 2; y++) {
+                    yearOpts += `<option value="${y}" ${y === thisYear ? 'selected' : ''}>${y}</option>`;
+                }
+                yearSel.innerHTML = yearOpts;
+            } else {
+                container.innerHTML = `
+                    <div>
+                        <label class="block text-xs font-semibold text-gray-600 mb-1">Month</label>
+                        <select id="cfg_${key}_flowMonth" class="px-3 py-2 border border-gray-300 rounded-md text-gray-800 text-sm"></select>
+                    </div>
+                    <div>
+                        <label class="block text-xs font-semibold text-gray-600 mb-1">Year</label>
+                        <select id="cfg_${key}_flowYear" class="px-3 py-2 border border-gray-300 rounded-md text-gray-800 text-sm"></select>
+                    </div>
+                `;
+                const monthSel = document.getElementById(`cfg_${key}_flowMonth`);
+                const yearSel = document.getElementById(`cfg_${key}_flowYear`);
+                monthSel.innerHTML = MONTH_NAMES.map((m, i) => `<option value="${i + 1}">${m}</option>`).join('');
+                let yearOpts = '';
+                for (let y = thisYear - 3; y <= thisYear + 2; y++) {
+                    yearOpts += `<option value="${y}" ${y === thisYear ? 'selected' : ''}>${y}</option>`;
+                }
+                yearSel.innerHTML = yearOpts;
+                monthSel.value = new Date().getMonth() + 1;
+            }
+        }
+
+        function saveFlowEntry(key) {
+            const nameInput = document.getElementById(`cfg_${key}_flowName`);
+            const revenueInput = document.getElementById(`cfg_${key}_flowRevenue`);
+            const granularity = document.getElementById(`cfg_${key}_flowGranularity`).value;
+            const name = nameInput.value.trim();
+            const revenue = parseFloat(revenueInput.value);
+
+            if (!name) { alert('Please enter a flow name.'); return; }
+            if (isNaN(revenue)) { alert('Please enter a valid revenue number.'); return; }
+
+            let period;
+            if (granularity === 'weekly') {
+                const week = parseInt(document.getElementById(`cfg_${key}_flowWeek`).value, 10);
+                const year = parseInt(document.getElementById(`cfg_${key}_flowYear`).value, 10);
+                if (isNaN(week) || week < 1 || week > 53) { alert('Please enter a valid week number (1-53).'); return; }
+                period = `${year}-W${String(week).padStart(2, '0')}`;
+            } else {
+                const month = parseInt(document.getElementById(`cfg_${key}_flowMonth`).value, 10);
+                const year = parseInt(document.getElementById(`cfg_${key}_flowYear`).value, 10);
+                period = `${year}-${String(month).padStart(2, '0')}`;
+            }
+
+            if (!flowsData[key]) flowsData[key] = { granularity, entries: [] };
+            flowsData[key].entries.push({
+                id: Date.now().toString(36) + Math.random().toString(36).slice(2),
+                name, period, granularity, revenue
+            });
+            persistFlowsData();
+            renderFlowsTable(key);
+            nameInput.value = '';
+            revenueInput.value = '';
+        }
+
+        function deleteFlowEntry(key, entryId) {
+            if (!flowsData[key]) return;
+            flowsData[key].entries = flowsData[key].entries.filter(e => e.id !== entryId);
+            persistFlowsData();
+            renderFlowsTable(key);
+        }
+
+        function periodToLabel(period, granularity) {
+            if (granularity === 'weekly') {
+                const [y, w] = period.split('-W');
+                return `Week ${parseInt(w, 10)}, ${y}`;
+            }
+            return monthKeyToLabel(period);
+        }
+
+        function renderFlowsTable(key) {
+            const tbody = document.querySelector(`#cfg_${key}_flowsTable tbody`);
+            if (!tbody) return;
+            const entries = (flowsData[key] && flowsData[key].entries) ? flowsData[key].entries.slice() : [];
+
+            if (entries.length === 0) {
+                tbody.innerHTML = `<tr><td colspan="4" class="text-center text-gray-400 py-3 text-xs">No flows added yet</td></tr>`;
+                return;
+            }
+
+            entries.sort((a, b) => b.period.localeCompare(a.period) || a.name.localeCompare(b.name));
+            let rows = '';
+            entries.forEach(e => {
+                rows += `
+                    <tr class="border-b border-gray-100">
+                        <td class="px-2 py-2 text-gray-700 font-medium">${e.name}</td>
+                        <td class="px-2 py-2 text-gray-600">${periodToLabel(e.period, e.granularity)}</td>
+                        <td class="px-2 py-2 text-right text-gray-800 font-medium">${formatRevenue(e.revenue)}</td>
+                        <td class="px-2 py-1 text-right"><button onclick="deleteFlowEntry('${key}','${e.id}')" class="text-red-500 hover:text-red-700 text-xs font-bold">✕</button></td>
+                    </tr>
+                `;
+            });
+            tbody.innerHTML = rows;
+        }
+
+        // Initialize Memory on Page Load
+        document.addEventListener('DOMContentLoaded', () => {
+            initRevenueYearMonthSelectors();
+            loadMonthlyRevenueData();
+            loadFlowsData();
+        });
+
+
+        // ========================================================
+        // ENGINE EXECUTION RUNTIMES: TOOL 1 (BIK ANALYSIS)
+        // ========================================================
+        let t1_currentMode = 'bik';
+        let t1_processedRows = [];
+
+        const t1_bikBlacklistKeywords = [
+            "assign to agent", "handling leakage cases", "negative - assign to agent", "positive/met - assign to agent",
+            "handling mix-up cases", "undelivered", "stop flow", "order update wa", "payment confirmation on whatsapp",
+            "order cancellation notification", "inbound share feedback", "anniversary journey"
+        ];
+
+        function t1_toggleFilterInputs() {
+            const type = document.getElementById('t1_filterType').value;
+            document.getElementById('t1_monthYearFilter').style.display = type === 'month' ? 'flex' : 'none';
+            document.getElementById('t1_customRangeFilter').style.display = type === 'range' ? 'flex' : 'none';
+        }
+
+        function t1_switchMode(mode, element) {
+            t1_currentMode = mode;
+            element.parentElement.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+            element.classList.add('active');
+            
+            const label = document.getElementById('t1_inputLabel');
+            const textPlaceholder = document.getElementById('t1_rawData');
+            const dateFilterPanel = document.getElementById('t1_dateFilterPanel');
+            
+            if (mode === 'bik') {
+                label.innerText = "Paste BIK.ai Raw Journey Sheet Report Here (Include Header Row):";
+                textPlaceholder.placeholder = "JourneyName\tChannels\tTotal Triggers\tMessages Sent\tMessages Delive...";
+                dateFilterPanel.style.display = "none";
+            } else if (mode === 'bik_campaigns') {
+                label.innerText = "Paste BIK.ai Broadcast Campaigns Export Sheet Here (Include Header Row):";
+                textPlaceholder.placeholder = "Campaign\tCampaign name\tChannel\tTimestamp\tDelivered\tRead rate\tLink clicks\tOrders\tRevenue...";
+                dateFilterPanel.style.display = "flex";
+            }
+            
+            document.getElementById('t1_errorMsg').style.display = 'none';
+            document.getElementById('t1_reportCard').style.display = 'none';
+            document.getElementById('t1_downloadBtn').disabled = true;
+            document.getElementById('t1_outputBody').innerHTML = '';
+            t1_processedRows = [];
+        }
+
+        function t1_passesDateFilter(dateStr) {
+            const type = document.getElementById('t1_filterType').value;
+            if (type === 'all' || !dateStr || t1_currentMode === 'bik') return true;
+
+            try {
+                let cleanPart = dateStr.split('·')[0].trim();
+                let rowDate = new Date(Date.parse(cleanPart));
+                if (isNaN(rowDate)) return true;
+
+                if (type === 'month') {
+                    const targetMonth = document.getElementById('t1_filterMonth').value;
+                    const targetYear = document.getElementById('t1_filterYear').value;
+                    let monthsMap = { Jan:0, Feb:1, Mar:2, Apr:3, May:4, Jun:5, Jul:6, Aug:7, Sep:8, Oct:9, Nov:10, Dec:11 };
+                    return rowDate.getMonth() === monthsMap[targetMonth] && rowDate.getFullYear() === parseInt(targetYear);
+                } 
+                if (type === 'range') {
+                    const startVal = document.getElementById('t1_startDate').value;
+                    const endVal = document.getElementById('t1_endDate').value;
+                    if (!startVal || !endVal) return true;
+                    let dStart = new Date(startVal);
+                    let dEnd = new Date(endVal);
+                    dEnd.setHours(23, 59, 59, 999);
+                    return rowDate >= dStart && rowDate <= dEnd;
+                }
+            } catch(e) { return true; }
+            return true;
+        }
+
+        function t1_shouldKeepBikJourney(name, revenue) {
+            let cleanName = name.trim().toLowerCase();
+            if (/^\d+$/.test(cleanName)) return false;
+            if (cleanName.endsWith('-whatsapp') || cleanName.endsWith('-instagram') || cleanName.endsWith('-messenger') || cleanName.endsWith('-comment')) {
+                return false;
+            }
+            for (let keyword of t1_bikBlacklistKeywords) {
+                if (cleanName.includes(keyword)) return false;
+            }
+            if (cleanName.startsWith('kl') || cleanName.includes('upsell') || revenue > 0) {
+                return true;
+            }
+            return true;
+        }
+
+        function t1_shouldKeepBikCampaign(name) {
+            let cleanName = name.trim().toLowerCase();
+            if (cleanName.includes("bad address") || cleanName.includes("feedback")) {
+                return false;
+            }
+            return true;
+        }
+
+        function t1_processData() {
+            const rawInput = document.getElementById('t1_rawData').value.trim();
+            const errorDiv = document.getElementById('t1_errorMsg');
+            const reportCard = document.getElementById('t1_reportCard');
+            const outputHead = document.getElementById('t1_outputHead');
+            const outputBody = document.getElementById('t1_outputBody');
+            const downloadBtn = document.getElementById('t1_downloadBtn');
+
+            errorDiv.style.display = 'none';
+            outputBody.innerHTML = '';
+            t1_processedRows = [];
+
+            if (!rawInput) {
+                t1_showError("Please paste data rows before compiling.");
+                return;
+            }
+
+            const lines = rawInput.split('\n');
+            if (lines.length < 2) {
+                t1_showError("Missing structure. Check header coordinates alignment.");
+                return;
+            }
+
+            const headers = lines[0].split('\t').map(h => h.trim().toLowerCase());
+            const cleanNum = (val) => {
+                if (!val || val.trim() === '-' || val.toLowerCase() === 'n/a') return 0;
+                let num = parseFloat(val.replace(/[^\d.-]/g, ''));
+                return isNaN(num) ? 0 : num;
+            };
+
+            if (t1_currentMode === 'bik') {
+                const idx = {
+                    name: headers.findIndex(h => h.includes('journeyname') || h === 'journey name'),
+                    delivered: headers.findIndex(h => h.includes('messages delive') || h.includes('delivered')),
+                    reads: headers.findIndex(h => h.includes('messages rea') || h.includes('read')),
+                    clicks: headers.findIndex(h => h.includes('link clicks') || h.includes('clicks')),
+                    orders: headers.findIndex(h => h.includes('orders') || h === 'conversions'),
+                    revenue: headers.findIndex(h => h === 'revenue' || h.includes('total revenue'))
+                };
+
+                if (idx.name === -1) idx.name = 0; if (idx.delivered === -1) idx.delivered = 9; if (idx.reads === -1) idx.reads = 10;
+                if (idx.clicks === -1) idx.clicks = 11; if (idx.orders === -1) idx.orders = 12; if (idx.revenue === -1) idx.revenue = 13;
+
+                outputHead.innerHTML = `<tr><th>Journey Name</th><th class="text-right">Delivered</th><th class="text-right">Read/Opens</th><th class="text-right">Clicks</th><th class="text-right">Revenue</th><th class="text-right">Conversions</th><th class="text-right">AOV</th></tr>`;
+
+                for (let i = 1; i < lines.length; i++) {
+                    if (!lines[i].trim()) continue;
+                    const cells = lines[i].split('\t');
+                    const rawName = cells[idx.name] ? cells[idx.name].trim() : '';
+                    if (!rawName) continue;
+                    
+                    const revenue = cleanNum(cells[idx.revenue]);
+                    if (!t1_shouldKeepBikJourney(rawName, revenue)) continue;
+
+                    const delivered = cleanNum(cells[idx.delivered]);
+                    const reads = cleanNum(cells[idx.reads]);
+                    const clicks = cleanNum(cells[idx.clicks]);
+                    const orders = cleanNum(cells[idx.orders]);
+                    let aov = orders > 0 ? revenue / orders : 0;
+
+                    t1_processedRows.push({ name: rawName, delivered, reads, clicks, revenue, orders, aov });
+                    t1_appendRowToTable([rawName, delivered.toLocaleString(), reads.toLocaleString(), clicks.toLocaleString(), '₹' + revenue.toLocaleString(undefined, {minimumFractionDigits:2}), orders.toLocaleString(), aov > 0 ? '₹' + aov.toLocaleString(undefined, {maximumFractionDigits:0}) : '0']);
+                }
+            }
+            else if (t1_currentMode === 'bik_campaigns') {
+                const idx = {
+                    name: headers.findIndex(h => h === 'campaign name' || h.includes('campaign name') || h === 'campaign_name'),
+                    channel: headers.findIndex(h => h === 'channel'),
+                    timestamp: headers.findIndex(h => h === 'timestamp' || h.includes('time')),
+                    delivered: headers.findIndex(h => h === 'delivered' || h.includes('delivered')),
+                    readRate: headers.findIndex(h => h.includes('read rate') || h.includes('open rate')),
+                    clicks: headers.findIndex(h => h.includes('link clicks') || h.includes('clicks')),
+                    orders: headers.findIndex(h => h === 'orders' || h.includes('orders')),
+                    revenue: headers.findIndex(h => h === 'revenue' || h.includes('revenue'))
+                };
+
+                if (idx.name === -1) idx.name = 1; if (idx.channel === -1) idx.channel = 2; if (idx.timestamp === -1) idx.timestamp = 3;
+                if (idx.delivered === -1) idx.delivered = 8; if (idx.readRate === -1) idx.readRate = 17; if (idx.clicks === -1) idx.clicks = 18;
+                if (idx.orders === -1) idx.orders = 11; if (idx.revenue === -1) idx.revenue = 12;
+
+                outputHead.innerHTML = `<tr><th>Date</th><th>Campaign Name</th><th>Type</th><th>Channel</th><th class="text-right">Open Rate %</th><th class="text-right">CTR%</th><th class="text-right">Spends</th><th class="text-right">Revenue</th><th class="text-right">ROI</th><th class="text-right">No. Of Orders</th></tr>`;
+
+                for (let i = 1; i < lines.length; i++) {
+                    if (!lines[i].trim()) continue;
+                    const cells = lines[i].split('\t');
+                    const name = cells[idx.name] ? cells[idx.name].trim() : '';
+                    
+                    if (!name || !t1_shouldKeepBikCampaign(name)) continue;
+                    
+                    const timestamp = cells[idx.timestamp] ? cells[idx.timestamp].trim() : '';
+                    if (!t1_passesDateFilter(timestamp)) continue;
+
+                    const date = timestamp ? timestamp.split(',')[0].trim() : '';
+                    const channel = cells[idx.channel] ? cells[idx.channel].trim() : 'whatsapp';
+                    const delivered = cleanNum(cells[idx.delivered]);
+                    const readRate = cleanNum(cells[idx.readRate]);
+                    const clicks = cleanNum(cells[idx.clicks]);
+                    const orders = cleanNum(cells[idx.orders]);
+                    const revenue = cleanNum(cells[idx.revenue]);
+
+                    let ctr = delivered > 0 ? (clicks / delivered) * 100 : 0;
+                    let spends = delivered * 0.90;
+                    let roi = spends > 0 ? (revenue / spends).toFixed(2) : (revenue > 0 ? '-' : '0.00');
+
+                    t1_processedRows.push({ date, name, type: '', channel, readRate, ctr, spends, revenue, roi, orders });
+
+                    const tr = document.createElement('tr');
+                    tr.innerHTML = `
+                        <td>${date}</td>
+                        <td><b>${name}</b></td>
+                        <td><i>--</i></td>
+                        <td><span style="background:#e0e7ff; padding:2px 6px; border-radius:4px; font-size:11px;">${channel.toUpperCase()}</span></td>
+                        <td class="text-right">${readRate.toFixed(2)}%</td>
+                        <td class="text-right">${ctr.toFixed(2)}%</td>
+                        <td class="text-right">₹${spends.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}</td>
+                        <td class="text-right">₹${revenue.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}</td>
+                        <td class="text-right" style="font-weight:bold; color:${roi > 0 ? '#047857' : 'inherit'}">${roi}</td>
+                        <td class="text-right">${orders}</td>
+                    `;
+                    outputBody.appendChild(tr);
+                }
+            }
+
+            if (t1_processedRows.length === 0) {
+                t1_showError("No data rows passed the active structural filtering conditions.");
+                return;
+            }
+            reportCard.style.display = 'block';
+            downloadBtn.disabled = false;
+        }
+
+        function t1_appendRowToTable(dataArray) {
+            const outputBody = document.getElementById('t1_outputBody');
+            const tr = document.createElement('tr');
+            dataArray.forEach((val, idx) => {
+                const td = document.createElement('td');
+                if (idx === 0 || idx === 1) { td.innerHTML = `<b>${val}</b>`; } 
+                else if (val.toString().startsWith('₹') || val.toString().endsWith('%') || !isNaN(val.replace(/,/g, ''))) {
+                    td.className = 'text-right'; td.innerText = val;
+                } else { td.innerText = val; }
+                tr.appendChild(td);
+            });
+            outputBody.appendChild(tr);
+        }
+
+        function t1_downloadCSV() {
+            if (t1_processedRows.length === 0) return;
+            let csvContent = "data:text/csv;charset=utf-8,";
+            if (t1_currentMode === 'bik') {
+                csvContent += "Journey Name,Delivered,Read/Opens,Clicks,Revenue,Conversions,AOV\r\n";
+                t1_processedRows.forEach(row => {
+                    csvContent += [`"${row.name.replace(/"/g, '""')}"`, row.delivered, row.reads, row.clicks, row.revenue.toFixed(2), row.orders, row.aov.toFixed(2)].join(",") + "\r\n";
+                });
+            } else if (t1_currentMode === 'bik_campaigns') {
+                csvContent += "Date,Campaign Name,Type,Channel,Open Rate %,CTR%,Spends,Revenue,ROI,No. Of Orders\r\n";
+                t1_processedRows.forEach(row => {
+                    csvContent += [`"${row.date}"`, `"${row.name.replace(/"/g, '""')}"`, "", `"${row.channel}"`, `${row.readRate.toFixed(2)}%`, `${row.ctr.toFixed(2)}%`, row.spends.toFixed(2), row.revenue.toFixed(2), row.roi, row.orders].join(",") + "\r\n";
+                });
+            }
+            const encodedUri = encodeURI(csvContent);
+            const link = document.createElement("a");
+            link.setAttribute("href", encodedUri);
+            link.setAttribute("download", `BIK_Normalized_${t1_currentMode}_Report.csv`);
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+        }
+        
+        // ========================================================
+        // ENGINE EXECUTION RUNTIMES: TOOL 6 (BITESPEED SUITE)
+        // ========================================================
+        let t6_currentMode = 'flows';
+        let t6_processedRows = [];
+
+        function t6_toggleFilterInputs() {
+            const type = document.getElementById('t6_filterType').value;
+            document.getElementById('t6_monthYearFilter').style.display = type === 'month' ? 'flex' : 'none';
+            document.getElementById('t6_customRangeFilter').style.display = type === 'range' ? 'flex' : 'none';
+        }
+
+        function t6_switchMode(mode, element) {
+            t6_currentMode = mode;
+            element.parentElement.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+            element.classList.add('active');
+            
+            const label = document.getElementById('t6_inputLabel');
+            const textPlaceholder = document.getElementById('t6_rawData');
+            const dateFilterPanel = document.getElementById('t6_dateFilterPanel');
+            
+            if (mode === 'flows') {
+                label.innerText = "Paste Bitespeed Flows Raw Data Here (Include Header Row):";
+                textPlaceholder.placeholder = "Journey name\tNo. of unique recipients\tTotal Revenue\tClicked count...";
+                dateFilterPanel.style.display = "flex";
+            } else if (mode === 'campaigns') {
+                label.innerText = "Paste Bitespeed Broadcast Campaigns Raw Data Here (Include Header Row):";
+                textPlaceholder.placeholder = "S. No.\tBroadcast\tChannel\tStatus\tScheduled at\tDelivered...";
+                dateFilterPanel.style.display = "flex";
+            }
+            
+            document.getElementById('t6_errorMsg').style.display = 'none';
+            document.getElementById('t6_reportCard').style.display = 'none';
+            document.getElementById('t6_downloadBtn').disabled = true;
+            document.getElementById('t6_outputBody').innerHTML = '';
+            t6_processedRows = [];
+        }
+
+        function t6_passesDateFilter(dateStr) {
+            const type = document.getElementById('t6_filterType').value;
+            if (type === 'all' || !dateStr) return true;
+
+            try {
+                let cleanPart = dateStr.split('·')[0].trim();
+                let rowDate = new Date(Date.parse(cleanPart));
+                if (isNaN(rowDate)) return true;
+
+                if (type === 'month') {
+                    const targetMonth = document.getElementById('t6_filterMonth').value;
+                    const targetYear = document.getElementById('t6_filterYear').value;
+                    let monthsMap = { Jan:0, Feb:1, Mar:2, Apr:3, May:4, Jun:5, Jul:6, Aug:7, Sep:8, Oct:9, Nov:10, Dec:11 };
+                    return rowDate.getMonth() === monthsMap[targetMonth] && rowDate.getFullYear() === parseInt(targetYear);
+                } 
+                if (type === 'range') {
+                    const startVal = document.getElementById('t6_startDate').value;
+                    const endVal = document.getElementById('t6_endDate').value;
+                    if (!startVal || !endVal) return true;
+                    let dStart = new Date(startVal);
+                    let dEnd = new Date(endVal);
+                    dEnd.setHours(23, 59, 59, 999);
+                    return rowDate >= dStart && rowDate <= dEnd;
+                }
+            } catch(e) { return true; }
+            return true;
+        }
+
+        function t6_processData() {
+            const rawInput = document.getElementById('t6_rawData').value.trim();
+            const errorDiv = document.getElementById('t6_errorMsg');
+            const reportCard = document.getElementById('t6_reportCard');
+            const outputHead = document.getElementById('t6_outputHead');
+            const outputBody = document.getElementById('t6_outputBody');
+            const downloadBtn = document.getElementById('t6_downloadBtn');
+
+            errorDiv.style.display = 'none';
+            outputBody.innerHTML = '';
+            t6_processedRows = [];
+
+            if (!rawInput) {
+                t6_showError("Please paste data rows before compiling.");
+                return;
+            }
+
+            const lines = rawInput.split('\n');
+            if (lines.length < 2) {
+                t6_showError("Missing structure. Check header coordinates alignment.");
+                return;
+            }
+
+            const headers = lines[0].split('\t').map(h => h.trim().toLowerCase());
+            const cleanNum = (val) => {
+                if (!val || val.trim() === '-' || val.toLowerCase() === 'n/a') return 0;
+                let num = parseFloat(val.replace(/[^\d.-]/g, ''));
+                return isNaN(num) ? 0 : num;
+            };
+
+            if (t6_currentMode === 'flows') {
+                let nameIdx = headers.findIndex(h => h === 'journey name' || h === 'automation name' || h.includes('journey name'));
+                const idx = {
+                    name: nameIdx !== -1 ? nameIdx : 2,
+                    date: headers.findIndex(h => h.includes('made live') || h.includes('created')),
+                    delivered: headers.findIndex(h => h.includes('unique recipients') || h.includes('delivered')),
+                    revenue: headers.findIndex(h => h.includes('total revenue') || h.includes('revenue')),
+                    clicks: headers.findIndex(h => h.includes('clicked count') || h.includes('clicks')),
+                    reads: headers.findIndex(h => h.includes('read count') || h.includes('reads')),
+                    cr: headers.findIndex(h => h.includes('conversion rate') || h.includes('cr %')),
+                    conversions: headers.findIndex(h => h.includes('conversion count'))
+                };
+
+                if (idx.date === -1) idx.date = 6; if (idx.delivered === -1) idx.delivered = 7; if (idx.revenue === -1) idx.revenue = 8;
+                if (idx.clicks === -1) idx.clicks = 9; if (idx.reads === -1) idx.reads = 11; if (idx.cr === -1) idx.cr = 14;
+
+                outputHead.innerHTML = `<tr><th>Journey name</th><th class="text-right">Delivered</th><th class="text-right">Read/Opens</th><th class="text-right">Clicks</th><th class="text-right">CR %</th><th class="text-right">Revenue</th><th class="text-right">AOV</th></tr>`;
+
+                for (let i = 1; i < lines.length; i++) {
+                    if (!lines[i].trim()) continue;
+                    const cells = lines[i].split('\t');
+                    if (!t6_passesDateFilter(cells[idx.date])) continue;
+
+                    const name = cells[idx.name] ? cells[idx.name].trim() : 'Unknown';
+                    const delivered = cleanNum(cells[idx.delivered]);
+                    const reads = cleanNum(cells[idx.reads]);
+                    const clicks = cleanNum(cells[idx.clicks]);
+                    const cr = cleanNum(cells[idx.cr]);
+                    const revenue = cleanNum(cells[idx.revenue]);
+                    let conversions = idx.conversions !== -1 ? cleanNum(cells[idx.conversions]) : 0;
+                    
+                    let aov = 0;
+                    if (conversions > 0) { aov = revenue / conversions; }
+                    else if (revenue > 0 && cr > 0 && delivered > 0) {
+                        let calcConv = Math.round((cr / 100) * delivered);
+                        aov = calcConv > 0 ? revenue / calcConv : revenue;
+                    }
+
+                    t6_processedRows.push({ name, delivered, reads, clicks, cr, revenue, aov, conversions });
+                    t6_appendRowToTable([name, delivered, reads, clicks, cr.toFixed(2) + '%', '₹' + revenue.toLocaleString(undefined, {minimumFractionDigits:2}), aov > 0 ? '₹' + aov.toLocaleString(undefined, {minimumFractionDigits:2}) : '0']);
+                }
+            }
+            else if (t6_currentMode === 'campaigns') {
+                const idx = {
+                    sno: headers.findIndex(h => h.includes('s. no.') || h === 's.no' || h === 'sno'),
+                    campaign: headers.findIndex(h => h.includes('broadcast') || h.includes('campaign')),
+                    channel: headers.findIndex(h => h === 'channel'),
+                    date: headers.findIndex(h => h.includes('scheduled') || h.includes('date')),
+                    openRate: headers.findIndex(h => h.includes('read rate') || h.includes('open rate')),
+                    ctr: headers.findIndex(h => h.includes('clicked rate') || h.includes('ctr')),
+                    spends: headers.findIndex(h => h === 'cost' || h === 'spends' || h.includes('spend')),
+                    revenue: headers.findIndex(h => h === 'revenue' || h.includes('total revenue')),
+                    orders: headers.findIndex(h => h.includes('conversion count') || h === 'orders')
+                };
+
+                if (idx.sno === -1) idx.sno = 0; if (idx.campaign === -1) idx.campaign = 1; if (idx.channel === -1) idx.channel = 3;
+                if (idx.date === -1) idx.date = 5; if (idx.openRate === -1) idx.openRate = 13; if (idx.ctr === -1) idx.ctr = 11;
+                if (idx.revenue === -1) idx.revenue = 9; if (idx.orders === -1) idx.orders = 15; if (idx.spends === -1) idx.spends = 19;
+
+                outputHead.innerHTML = `<tr><th>Date</th><th>Campaign Name</th><th>Offer</th><th>Type</th><th>Channel</th><th class="text-right">Open Rate %</th><th class="text-right">CTR%</th><th class="text-right">Spends</th><th class="text-right">Revenue</th><th class="text-right">Orders</th><th class="text-right">ROI</th></tr>`;
+
+                for (let i = 1; i < lines.length; i++) {
+                    if (!lines[i].trim()) continue;
+                    const cells = lines[i].split('\t');
+                    const serialNum = cells[idx.sno] ? cells[idx.sno].trim() : '';
+                    if (!serialNum || isNaN(parseInt(serialNum))) continue;
+                    if (!t6_passesDateFilter(cells[idx.date])) continue;
+
+                    const name = cells[idx.campaign] ? cells[idx.campaign].trim() : 'Unknown';
+                    const date = cells[idx.date] ? cells[idx.date].split('·')[0].trim() : '';
+                    const channel = cells[idx.channel] ? cells[idx.channel].trim() : 'whatsapp';
+                    const openRate = cleanNum(cells[idx.openRate]);
+                    const ctr = cleanNum(cells[idx.ctr]);
+                    const spends = cleanNum(cells[idx.spends]);
+                    const revenue = cleanNum(cells[idx.revenue]);
+                    const orders = cleanNum(cells[idx.orders]);
+                    let roi = spends > 0 ? (revenue / spends).toFixed(2) : (revenue > 0 ? '-' : '0.00');
+
+                    t6_processedRows.push({ date, campaign: name, offer: '', type: '', channel, openRate, ctr, spends, revenue, orders, roi });
+                    t6_appendRowToTable([date, name, '', '', channel.toUpperCase(), openRate > 0 ? openRate.toFixed(2) + '%' : 'N/A', ctr.toFixed(2) + '%', '₹' + spends.toLocaleString(), '₹' + revenue.toLocaleString(), orders, roi]);
+                }
+            }
+
+            if (t6_processedRows.length === 0) {
+                t6_showError("No data rows passed the active structural filtering conditions.");
+                return;
+            }
+            reportCard.style.display = 'block';
+            downloadBtn.disabled = false;
+        }
+
+        function t6_appendRowToTable(dataArray) {
+            const outputBody = document.getElementById('t6_outputBody');
+            const tr = document.createElement('tr');
+            dataArray.forEach((val, idx) => {
+                const td = document.createElement('td');
+                if (idx === 0 || idx === 1) { td.innerHTML = `<b>${val}</b>`; } 
+                else if (val.toString().startsWith('₹') || val.toString().endsWith('%') || !isNaN(val)) {
+                    td.className = 'text-right'; td.innerText = val;
+                } else { td.innerText = val; }
+                tr.appendChild(td);
+            });
+            outputBody.appendChild(tr);
+        }
+
+        function t6_showError(msg) {
+            const errorDiv = document.getElementById('t6_errorMsg');
+            errorDiv.innerText = msg;
+            errorDiv.style.display = 'block';
+        }
+
+        // ========================================================
+        // ENGINE EXECUTION RUNTIMES: TOOL 2 (KLAVIYO FLOWS)
+        // ========================================================
+        function t2_getWeek(dateStr) {
+            const cleanDate = dateStr.replace(/-/g, '/');
+            const d = new Date(cleanDate);
+            const day = d.getDate();
+            if (day <= 7) return "Feb 1-7";
+            if (day <= 14) return "Feb 8-14";
+            if (day <= 21) return "Feb 15-21";
+            if (day <= 28) return "Feb 22-28";
+            return "Feb 29-31";
+        }
+
+        function t2_processData() {
+            const input = document.getElementById('t2_rawInput').value.trim();
+            if(!input) return alert("Please paste data!");
+
+            const lines = input.split('\n');
+            const headers = lines[0].split('\t').map(h => h.trim().toLowerCase());
+
+            const cols = {
+                day: headers.indexOf('day'),
+                name: headers.indexOf('flow name'),
+                delivered: headers.indexOf('delivered'),
+                opens: headers.indexOf('unique opens'),
+                clicks: headers.indexOf('unique clicks'),
+                orders: headers.indexOf('placed order'),
+                rev: headers.indexOf('revenue')
+            };
+
+            if(cols.name === -1 || cols.day === -1) {
+                return alert("Header error: 'Day' or 'Flow Name' not found.");
+            }
+
+            const dataTree = {};
+
+            for (let i = 1; i < lines.length; i++) {
+                const cells = lines[i].split('\t');
+                if (cells.length < 5) continue;
+
+                const name = cells[cols.name];
+                const week = t2_getWeek(cells[cols.day]);
+
+                if (!dataTree[name]) {
+                    dataTree[name] = {
+                        "Feb 1-7": { recipients: 0, opens: 0, clicks: 0, orders: 0, revenue: 0 },
+                        "Feb 8-14": { recipients: 0, opens: 0, clicks: 0, orders: 0, revenue: 0 },
+                        "Feb 15-21": { recipients: 0, opens: 0, clicks: 0, orders: 0, revenue: 0 },
+                        "Feb 22-28": { recipients: 0, opens: 0, clicks: 0, orders: 0, revenue: 0 },
+                        "Feb 29-31": { recipients: 0, opens: 0, clicks: 0, orders: 0, revenue: 0 }
+                    };
+                }
+
+                const wObj = dataTree[name][week];
+                wObj.recipients += parseInt(cells[cols.delivered]) || 0;
+                wObj.opens += parseInt(cells[cols.opens]) || 0;
+                wObj.clicks += parseInt(cells[cols.clicks]) || 0;
+                wObj.orders += parseInt(cells[cols.orders]) || 0;
+                wObj.revenue += parseFloat(cells[cols.rev].replace(/[^0-9.-]+/g,"")) || 0;
+            }
+
+            t2_renderTables(dataTree);
+        }
+
+        function t2_renderTables(tree) {
+            let html = '<div class="main-header">BAU Automations (Weekly)</div>';
+            const weeks = ["Feb 1-7", "Feb 8-14", "Feb 15-21", "Feb 22-28", "Feb 29-31"];
+
+            for (let flowName in tree) {
+                html += `<table>
+                    <thead>
+                        <tr>
+                            <th>Flow Name</th>
+                            <th>Period</th>
+                            <th>Unique Recipients</th>
+                            <th>Read/Opens</th>
+                            <th>Clicks</th>
+                            <th>Conversions</th>
+                            <th>Revenue</th>
+                            <th>AOV</th>
+                        </tr>
+                    </thead>
+                    <tbody>`;
+
+                let totals = { recipients: 0, opens: 0, clicks: 0, orders: 0, revenue: 0 };
+
+                weeks.forEach((w, idx) => {
+                    const d = tree[flowName][w];
+                    const aov = d.orders > 0 ? (d.revenue / d.orders).toFixed(0) : 0;
+                    
+                    html += `<tr>
+                        ${idx === 0 ? `<td class="flow-name-cell" rowspan="6">${flowName}</td>` : ''}
+                        <td class="period-cell">${w}</td>
+                        <td>${d.recipients.toLocaleString()}</td>
+                        <td>${d.opens.toLocaleString()}</td>
+                        <td>${d.clicks.toLocaleString()}</td>
+                        <td>${d.orders.toLocaleString()}</td>
+                        <td class="currency">$${d.revenue.toLocaleString(undefined, {minimumFractionDigits:2})}</td>
+                        <td>${aov}</td>
+                    </tr>`;
+
+                    totals.recipients += d.recipients;
+                    totals.opens += d.opens;
+                    totals.clicks += d.clicks;
+                    totals.orders += d.orders;
+                    totals.revenue += d.revenue;
+                });
+
+                const grandAov = totals.orders > 0 ? (totals.revenue / totals.orders).toFixed(0) : 0;
+                html += `<tr class="total-row">
+                    <td class="period-cell">Total</td>
+                    <td>${totals.recipients.toLocaleString()}</td>
+                    <td>${totals.opens.toLocaleString()}</td>
+                    <td>${totals.clicks.toLocaleString()}</td>
+                    <td>${totals.orders.toLocaleString()}</td>
+                    <td class="currency">$${totals.revenue.toLocaleString(undefined, {minimumFractionDigits:2})}</td>
+                    <td>${grandAov}</td>
+                </tr></tbody></table>`;
+            }
+
+            document.getElementById('t2_outputArea').innerHTML = html;
+        }
+
+        function t2_exportCSV() {
+            const rows = [];
+            const tables = document.getElementById('t2_outputArea').querySelectorAll('table');
+            if(tables.length === 0) return alert("Generate data before running downloads.");
+            rows.push("Flow Name,Period,Unique Recipients,Read/Opens,Clicks,Conversions,Revenue,AOV");
+
+            tables.forEach(table => {
+                const flowName = table.querySelector('.flow-name-cell').innerText;
+                const tableRows = table.querySelectorAll('tbody tr');
+                tableRows.forEach(tr => {
+                    const cells = tr.querySelectorAll('td');
+                    const rowData = Array.from(cells).map(td => td.innerText.replace(/[$|,]/g, ''));
+                    if (rowData.length < 8) rowData.unshift(flowName);
+                    rows.push(rowData.join(','));
+                });
+            });
+
+            const csvString = rows.join('\n');
+            const blob = new Blob([csvString], { type: 'text/csv' });
+            const link = document.createElement('a');
+            link.href = URL.createObjectURL(blob);
+            link.download = 'Weekly_Automation_Analysis.csv';
+            link.click();
+        }
+
+        // ========================================================
+        // ENGINE EXECUTION RUNTIMES: TOOL 3 (LIMECHAT AGGREGATOR)
+        // ========================================================
+        let t3_trackingReportData = null;
+
+        function t3_cleanFlowName(name) {
+            if (!name) return "";
+            return name.replace(/^Flow\s+\d+\s*[-–—]\s*/i, "").trim();
+        }
+
+        function t3_parseDateStr(dateStr) {
+            if (!dateStr) return null;
+            const parts = dateStr.trim().split(/[-/]/);
+            if (parts.length === 3) {
+                const day = parseInt(parts[0], 10);
+                const month = parseInt(parts[1], 10) - 1;
+                const year = parseInt(parts[2], 10);
+                return new Date(year, month, day);
+            }
+            return null;
+        }
+
+        function t3_getPeriodLabel(date, monthString, viewType) {
+            const day = date.getDate();
+            const monthIdx = date.getMonth();
+            const monthsShort = ["Jan", "Feb", "Mar", "Apr", "May", "June", "July", "Aug", "Sept", "Oct", "Nov", "Dec"];
+            
+            let baseMonth = monthsShort[monthIdx];
+            if (monthString && monthString.includes("-")) {
+                baseMonth = monthString.split("-")[1].trim();
+            }
+
+            if (viewType === "month") {
+                return baseMonth;
+            }
+
+            if (day >= 1 && day <= 7) return `${baseMonth} 1-7`;
+            if (day >= 8 && day <= 14) return `${baseMonth} 8-14`;
+            if (day >= 15 && day <= 21) return `${baseMonth} 15-21`;
+            
+            const lastDay = new Date(date.getFullYear(), monthIdx + 1, 0).getDate();
+            return `${baseMonth} 22-${lastDay}`;
+        }
+
+        function t3_processData() {
+            const rawText = document.getElementById('t3_rawData').value.trim();
+            if (!rawText) return;
+
+            const viewType = document.getElementById('t3_breakdownView').value;
+            const lines = rawText.split('\n');
+            const flows = {};
+            let currentFlowId = "";
+
+            for (let i = 0; i < lines.length; i++) {
+                const row = lines[i].split('\t');
+                if (row.length < 4 || row[0].toLowerCase().includes("flow id")) continue;
+
+                if (row[0].trim() !== "") {
+                    currentFlowId = t3_cleanFlowName(row[0].trim());
+                }
+                
+                if (row[2] && row[2].toLowerCase().includes("total")) continue;
+
+                const monthStr = row[1];
+                const dateStr = row[2];
+                const dateObj = t3_parseDateStr(dateStr);
+                if (!dateObj) continue;
+
+                const sent = parseFloat(row[3]) || 0;
+                const delivered = parseFloat(row[4]) || 0;
+                const read = parseFloat(row[6]) || 0;
+                const orders = parseFloat(row[8]) || 0;
+                const revenue = parseFloat(row[9]) || 0;
+
+                const label = t3_getPeriodLabel(dateObj, monthStr, viewType);
+
+                if (!flows[currentFlowId]) {
+                    flows[currentFlowId] = { periods: {}, orderedKeys: [] };
+                }
+
+                if (!flows[currentFlowId].periods[label]) {
+                    flows[currentFlowId].periods[label] = { sent: 0, delivered: 0, read: 0, orders: 0, revenue: 0, minTimestamp: dateObj.getTime() };
+                    flows[currentFlowId].orderedKeys.push(label);
+                } else {
+                    if (dateObj.getTime() < flows[currentFlowId].periods[label].minTimestamp) {
+                        flows[currentFlowId].periods[label].minTimestamp = dateObj.getTime();
+                    }
+                }
+
+                flows[currentFlowId].periods[label].sent += sent;
+                flows[currentFlowId].periods[label].delivered += delivered;
+                flows[currentFlowId].periods[label].read += read;
+                flows[currentFlowId].periods[label].orders += orders;
+                flows[currentFlowId].periods[label].revenue += revenue;
+            }
+
+            t3_trackingReportData = flows;
+            let hasData = false;
+
+            let html = `<table>
+                <tr>
+                    <th colspan="7" class="header-main">Limechat Automations</th>
+                </tr>
+                <tr>
+                    <th colspan="7" class="header-sub">BAU Automations</th>
+                </tr>
+                <tr style="background-color:#f5f6fa; font-weight:bold;">
+                    <td>Flow Name</td>
+                    <td>Period</td>
+                    <td>Delivered</td>
+                    <td>Read/Opens</td>
+                    <td>Clicks/Orders</td>
+                    <td>CR %</td>
+                    <td>Revenue</td>
+                </tr>`;
+
+            for (const flowName in flows) {
+                hasData = true;
+                const flowData = flows[flowName];
+                
+                const periodKeys = flowData.orderedKeys.sort((a, b) => {
+                    return flowData.periods[a].minTimestamp - flowData.periods[b].minTimestamp;
+                });
+                
+                const rowSpan = periodKeys.length + 1;
+                let flowTotal = { sent: 0, delivered: 0, read: 0, orders: 0, revenue: 0 };
+
+                periodKeys.forEach((period, idx) => {
+                    const data = flowData.periods[period];
+                    const cr = data.delivered > 0 ? ((data.orders / data.delivered) * 100).toFixed(0) + '%' : '0%';
+                    
+                    flowTotal.sent += data.sent;
+                    flowTotal.delivered += data.delivered;
+                    flowTotal.read += data.read;
+                    flowTotal.orders += data.orders;
+                    flowTotal.revenue += data.revenue;
+
+                    html += `<tr>`;
+                    if (idx === 0) {
+                        html += `<td rowspan="${rowSpan}" class="flow-name-cell">${flowName}</td>`;
+                    }
+                    html += `
+                        <td>${period}</td>
+                        <td>${data.delivered.toLocaleString()}</td>
+                        <td>${data.read.toLocaleString()}</td>
+                        <td>${data.orders.toLocaleString()}</td>
+                        <td>${cr}</td>
+                        <td>₹ ${data.revenue.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}</td>
+                    </tr>`;
+                });
+
+                const totalCr = flowTotal.delivered > 0 ? ((flowTotal.orders / flowTotal.delivered) * 100).toFixed(0) + '%' : '0%';
+                html += `<tr class="row-total">
+                    <td>Total</td>
+                    <td>${flowTotal.delivered.toLocaleString()}</td>
+                    <td>${flowTotal.read.toLocaleString()}</td>
+                    <td>${flowTotal.orders.toLocaleString()}</td>
+                    <td>${totalCr}</td>
+                    <td>₹ ${flowTotal.revenue.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}</td>
+                </tr>`;
+            }
+
+            html += `</table>`;
+            document.getElementById('t3_reportOutput').innerHTML = html;
+            document.getElementById('t3_downloadBtn').style.display = hasData ? 'inline-block' : 'none';
+        }
+
+        function t3_downloadCSV() {
+            if (!t3_trackingReportData) return;
+
+            let csv = "Limechat Automations\nBAU Automations\n\n";
+            csv += "Flow Name,Period,Delivered,Read/Opens,Clicks/Orders,CR %,Revenue\n";
+
+            for (const flowName in t3_trackingReportData) {
+                const flowData = t3_trackingReportData[flowName];
+                
+                const periodKeys = flowData.orderedKeys.sort((a, b) => {
+                    return flowData.periods[a].minTimestamp - flowData.periods[b].minTimestamp;
+                });
+
+                let totalDelivered = 0, totalRead = 0, totalOrders = 0, totalRevenue = 0;
+
+                periodKeys.forEach(period => {
+                    const data = flowData.periods[period];
+                    const cr = data.delivered > 0 ? ((data.orders / data.delivered) * 100).toFixed(0) + '%' : '0%';
+                    
+                    totalDelivered += data.delivered;
+                    totalRead += data.read;
+                    totalOrders += data.orders;
+                    totalRevenue += data.revenue;
+
+                    csv += `"${flowName.replace(/"/g, '""')}",${period},${data.delivered},${data.read},${data.orders},${cr},${data.revenue.toFixed(2)}\n`;
+                });
+
+                const finalCr = totalDelivered > 0 ? ((totalOrders / totalDelivered) * 100).toFixed(0) + '%' : '0%';
+                csv += `"",Total,${totalDelivered},${totalRead},${totalOrders},${finalCr},${totalRevenue.toFixed(2)}\n`;
+            }
+
+            const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+            const link = document.createElement("a");
+            link.href = URL.createObjectURL(blob);
+            link.setAttribute("download", "limechat_chronological_report.csv");
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+        }
+
+        // ========================================================
+        // ENGINE EXECUTION RUNTIMES: TOOL 4 (AIZA WEBENGAGE SUITE)
+        // ========================================================
+        const t4_WA_RATE = 0.16;
+        let t4_finalDataStore = [];
+
+        function t4_detectLang(jName, cName) {
+            const j = jName.toLowerCase();
+            const c = cName.toLowerCase();
+            if (j.includes('order confirmed') || j.includes('order confirmation')) {
+                if (c.includes('_ar')) return 'AR';
+                if (c.includes('_1')) return 'EN';
+            }
+            if (j.includes('order shipped')) {
+                return c.includes('_ar') ? 'AR' : 'EN';
+            }
+            if (j.includes('_ar') || j.includes('arabic') || c.includes('_ar')) return 'AR';
+            return 'EN';
+        }
+
+        function t4_process() {
+            const input = document.getElementById('t4_dataInput').value.trim();
+            if (!input) return;
+
+            const rows = input.split('\n').map(r => r.split('\t'));
+            const headers = rows[0].map(h => h.trim());
+            const dataRows = rows.slice(1);
+            const getIdx = (name) => headers.indexOf(name);
+            
+            const col = {
+                day: getIdx('Day'), camp: getIdx('Campaign Name'), chan: getIdx('Channel'),
+                jName: getIdx('Journey Name'), jId: getIdx('Journey ID'), sent: getIdx('Sent'),
+                deliv: getIdx('Delivered'), open: getIdx('Unique Impressions'), click: getIdx('Unique Clicks'),
+                orders: getIdx('Unique Click-Through Conversions'), rev: getIdx('Click-Through Revenue (AED)')
+            };
+
+            const report = {};
+
+            dataRows.forEach(row => {
+                const jId = row[col.jId];
+                if (!jId || jId === 'BS') return;
+
+                const d = parseInt(row[col.day] ? row[col.day].split('-')[0] : "1");
+                let wk = "Week 1";
+                if (d > 7 && d <= 14) wk = "Week 2"; 
+                else if (d > 14 && d <= 21) wk = "Week 3"; 
+                else if (d > 21) wk = "Week 4";
+
+                const lang = t4_detectLang(row[col.jName], row[col.camp]);
+                const channel = row[col.chan];
+                const variation = `${channel}-${lang}`;
+
+                if (!report[jId]) report[jId] = { name: row[col.jName], data: {} };
+                if (!report[jId].data[variation]) report[jId].data[variation] = {};
+                if (!report[jId].data[variation][wk]) {
+                    report[jId].data[variation][wk] = { sent:0, deliv:0, open:0, click:0, orders:0, rev:0 };
+                }
+
+                const metrics = report[jId].data[variation][wk];
+                metrics.sent += parseInt(row[col.sent]) || 0;
+                metrics.deliv += parseInt(row[col.deliv]) || 0;
+                metrics.open += parseInt(row[col.open]) || 0;
+                metrics.click += parseInt(row[col.click]) || 0;
+                metrics.orders += parseInt(row[col.orders]) || 0;
+                metrics.rev += parseFloat(row[col.rev]) || 0;
+            });
+
+            t4_render(report);
+        }
+
+        function t4_render(report) {
+            const out = document.getElementById('t4_output');
+            out.innerHTML = '';
+            t4_finalDataStore = [];
+
+            let html = `<table><thead><tr>
+                <th>Name</th><th>Week</th><th>Journey ID</th><th>Channel/Variation</th><th>Sent</th><th>Delivered</th>
+                <th>Spends (AED)</th><th>Opened</th><th>Clicked</th><th>Total Orders</th><th>Revenue (AED)</th>
+                <th>AOV</th><th>CR%</th></tr></thead><tbody>`;
+
+            Object.keys(report).forEach(jId => {
+                const journey = report[jId];
+                
+                const variations = Object.keys(journey.data).sort((a, b) => {
+                    const [c1, l1] = a.split('-');
+                    const [c2, l2] = b.split('-');
+                    if (c1 !== c2) return c1 === 'WhatsApp' ? -1 : 1;
+                    return l1 === 'EN' ? -1 : 1;
+                });
+
+                let jT = { sent:0, deliv:0, spend:0, open:0, click:0, orders:0, rev:0 };
+
+                variations.forEach(v => {
+                    const weeks = Object.keys(journey.data[v]).sort();
+                    weeks.forEach(wk => {
+                        const m = journey.data[v][wk];
+                        const spends = v.includes('WhatsApp') ? (m.deliv * t4_WA_RATE) : 0;
+                        const aov = m.orders > 0 ? (m.rev / m.orders) : 0;
+                        const cr = m.deliv > 0 ? (m.orders / m.deliv) * 100 : 0;
+
+                        jT.sent += m.sent; jT.deliv += m.deliv; jT.spend += spends;
+                        jT.open += m.open; jT.click += m.click; jT.orders += m.orders; jT.rev += m.rev;
+
+                        html += `<tr>
+                            <td>${journey.name}</td><td>${wk}</td><td>${jId}</td><td>${v}</td>
+                            <td class="num">${m.sent}</td><td class="num">${m.deliv}</td>
+                            <td class="num">${spends.toFixed(2)}</td><td class="num">${m.open}</td>
+                            <td class="num">${m.click}</td><td class="num">${m.orders}</td>
+                            <td class="num">${m.rev.toFixed(2)}</td><td class="num">${aov.toFixed(2)}</td>
+                            <td class="num">${cr.toFixed(2)}%</td></tr>`;
+                        
+                        t4_finalDataStore.push({name: journey.name, wk, jId, v, ...m, spends, aov, cr});
+                    });
+                });
+
+                const totAov = jT.orders > 0 ? (jT.rev / jT.orders) : 0;
+                const totCr = jT.deliv > 0 ? (jT.orders / jT.deliv) * 100 : 0;
+                html += `<tr class="total-row"><td colspan="3" style="text-align:right">Total</td><td></td>
+                    <td class="num">${jT.sent}</td><td class="num">${jT.deliv}</td>
+                    <td class="num">${jT.spend.toFixed(2)}</td><td class="num">${jT.open}</td>
+                    <td class="num">${jT.click}</td><td class="num">${jT.orders}</td>
+                    <td class="num">${jT.rev.toFixed(2)}</td><td class="num">${totAov.toFixed(2)}</td>
+                    <td class="num">${totCr.toFixed(2)}%</td></tr>`;
+            });
+
+            html += `</tbody></table>`;
+            out.innerHTML = html;
+            document.getElementById('t4_dlBtn').style.display = 'inline-block';
+        }
+
+        function t4_downloadCSV() {
+            let csv = "Name,Week,Journey ID,Channel/Variation,Sent,Delivered,Spends (AED),Opened,Clicked,Total Orders,Revenue (AED),AOV,CR%\n";
+            let jSent=0, jDel=0, jSp=0, jOp=0, jCl=0, jOrd=0, jRev=0;
+
+            t4_finalDataStore.forEach((d, i) => {
+                if (i > 0 && d.jId !== t4_finalDataStore[i-1].jId) {
+                    csv += `Total,,, ,${jSent},${jDel},${jSp.toFixed(2)},${jOp},${jCl},${jOrd},${jRev.toFixed(2)},${jOrd>0?(jRev/jOrd).toFixed(2):0},${jDel>0?((jOrd/jDel)*100).toFixed(2):0}%\n`;
+                    jSent=0; jDel=0; jSp=0; jOp=0; jCl=0; jOrd=0; jRev=0;
+                }
+                
+                csv += `"${d.name}",${d.wk},${d.jId},${d.v},${d.sent},${d.deliv},${d.spends.toFixed(2)},${d.open},${d.click},${d.orders},${d.rev.toFixed(2)},${d.aov.toFixed(2)},${d.cr.toFixed(2)}%\n`;
+                
+                jSent+=d.sent; jDel+=d.deliv; jSp+=d.spends; jOp+=d.open; jCl+=d.click; jOrd+=d.orders; jRev+=d.rev;
+
+                if (i === t4_finalDataStore.length - 1) {
+                    csv += `Total,,, ,${jSent},${jDel},${jSp.toFixed(2)},${jOp},${jCl},${jOrd},${jRev.toFixed(2)},${jOrd>0?(jRev/jOrd).toFixed(2):0},${jDel>0?((jOrd/jDel)*100).toFixed(2):0}%\n`;
+                }
+            });
+
+            const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+            const link = document.createElement("a");
+            link.setAttribute("href", URL.createObjectURL(blob));
+            link.setAttribute("download", "Journey_Weekly_Analysis.csv");
+            link.click();
+        }
+
+        // ========================================================
+        // ENGINE EXECUTION RUNTIMES: TOOL 5 (KLAVIYO MONTHLY AGG)
+        // ========================================================
+        let t5_processedData = [];
+
+        document.getElementById('t5_csvFile').addEventListener('change', function(e) {
+            const file = e.target.files[0];
+            if(!file) return;
+            Papa.parse(file, {
+                header: true,
+                dynamicTyping: true,
+                skipEmptyLines: true,
+                complete: function(results) {
+                    t5_analyzeData(results.data);
+                }
+            });
+        });
+
+        function t5_processPaste() {
+            const text = document.getElementById('t5_pasteArea').value.trim();
+            if(!text) return alert("Paste data matrix into text zone first.");
+            Papa.parse(text, {
+                header: true,
+                dynamicTyping: true,
+                skipEmptyLines: true,
+                complete: function(results) {
+                    t5_analyzeData(results.data);
+                }
+            });
+        }
+
+        function t5_analyzeData(rawData) {
+            if (!rawData || rawData.length === 0) return alert("Data validation check failed. Structure is missing values.");
+
+            const groupingKey = "Flow Name";
+            const totals = {};
+            const keys = Object.keys(rawData[0]);
+            
+            const numericKeys = keys.filter(key => 
+                typeof rawData[0][key] === 'number' && 
+                !key.toLowerCase().includes('id') && 
+                key !== groupingKey
+            );
+
+            rawData.forEach(row => {
+                const name = row[groupingKey];
+                if (!name) return;
+
+                if (!totals[name]) {
+                    totals[name] = { [groupingKey]: name };
+                    numericKeys.forEach(k => totals[name][k] = 0);
+                }
+
+                numericKeys.forEach(k => {
+                    totals[name][k] += (row[k] || 0);
+                });
+            });
+
+            t5_processedData = Object.values(totals);
+            t5_displayData(t5_processedData, [groupingKey, ...numericKeys]);
+        }
+
+        function t5_displayData(data, headers) {
+            const head = document.getElementById('t5_tableHead');
+            const body = document.getElementById('t5_tableBody');
+            const table = document.getElementById('t5_resultTable');
+            const controls = document.getElementById('t5_controls');
+
+            head.innerHTML = '';
+            body.innerHTML = '';
+
+            const trHead = document.createElement('tr');
+            headers.forEach(h => {
+                const th = document.createElement('th');
+                th.className = "px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider border-b border-gray-200";
+                th.innerText = h;
+                trHead.appendChild(th);
+            });
+            head.appendChild(trHead);
+
+            data.forEach(row => {
+                const tr = document.createElement('tr');
+                tr.className = "hover:bg-gray-50 transition-colors";
+                headers.forEach(h => {
+                    const td = document.createElement('td');
+                    td.className = "px-4 py-2 whitespace-nowrap text-sm text-gray-700 border-b border-gray-100";
+                    const val = row[h];
+                    td.innerText = typeof val === 'number' ? val.toLocaleString(undefined, {maximumFractionDigits: 2}) : val;
+                    tr.appendChild(td);
+                });
+                body.appendChild(tr);
+            });
+
+            table.classList.remove('hidden');
+            controls.classList.remove('hidden');
+        }
+
+        function t5_downloadCSV() {
+            if(t5_processedData.length === 0) return;
+            const csv = Papa.unparse(t5_processedData);
+            const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+            const link = document.createElement("a");
+            const url = URL.createObjectURL(blob);
+            link.setAttribute("href", url);
+            link.setAttribute("download", "flow_analysis.csv");
+            link.style.visibility = 'hidden';
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+        }
+
+        function t5_copyToClipboard() {
+            if(t5_processedData.length === 0) return;
+            const csv = Papa.unparse(t5_processedData);
+            navigator.clipboard.writeText(csv).then(() => {
+                alert("Data matrix successfully copied to clipboard in CSV format!");
+            });
+        }
+
+    </script>
+</body>
+</html>
